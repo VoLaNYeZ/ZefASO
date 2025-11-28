@@ -103,6 +103,16 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         setEndDate(toLocalStr(end));
     };
 
+    // Check active states
+    const now = new Date();
+    const thisMonthStart = toLocalStr(new Date(now.getFullYear(), now.getMonth(), 1));
+    const thisMonthEnd = toLocalStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+    const lastMonthStart = toLocalStr(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    const lastMonthEnd = toLocalStr(new Date(now.getFullYear(), now.getMonth(), 0));
+
+    const isThisMonth = startDate === thisMonthStart && endDate === thisMonthEnd;
+    const isLastMonth = startDate === lastMonthStart && endDate === lastMonthEnd;
+
     // -- Aggregation Logic --
     const aggregatedData: ProcessedApp[] = useMemo(() => {
         // 1. Filter by Date and Category
@@ -309,13 +319,19 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setQuickDate('lastMonth')}
-                            className="px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors border border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50"
+                            className={`px-3 py-2 text-xs font-bold rounded-lg transition-colors border ${isLastMonth
+                                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                    : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                }`}
                         >
                             {t.lastMonth}
                         </button>
                         <button
                             onClick={() => setQuickDate('thisMonth')}
-                            className="px-3 py-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-900/50 rounded-lg shadow-sm"
+                            className={`px-3 py-2 text-xs font-bold rounded-lg transition-colors border ${isThisMonth
+                                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                    : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                }`}
                         >
                             {t.thisMonth}
                         </button>
