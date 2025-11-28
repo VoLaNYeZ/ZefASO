@@ -46,7 +46,8 @@ import {
     FlaskConical,
     Sun,
     Moon,
-    Languages
+    Languages,
+    LogOut
 } from 'lucide-react';
 import { INITIAL_DATA } from './constants';
 import { AsoEntry, FilterState, Granularity } from './types';
@@ -57,8 +58,30 @@ import { DateRangePicker } from './components/DateRangePicker';
 import { analyzeASOTrends } from './services/geminiService';
 import { OverviewDashboard } from './components/OverviewDashboard';
 import { ComparisonDashboard } from './components/ComparisonDashboard';
+import { supabase } from './lib/supabase';
+import { LoginPage } from './components/LoginPage';
+import { Session } from '@supabase/supabase-js';
 
 const App = () => {
+    // -- Auth State --
+    const [session, setSession] = useState<Session | null>(null);
+    const [authLoading, setAuthLoading] = useState(true);
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            setAuthLoading(false);
+        });
+
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
     // -- State: Data Persistence --
     const [data, setData] = useState<AsoEntry[]>(() => {
         try {
@@ -715,6 +738,22 @@ const App = () => {
         }
     };
 
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+    };
+
+    if (authLoading) {
+        return (
+            <div className={`flex h-screen items-center justify-center ${theme === 'dark' ? 'bg-slate-950' : 'bg-slate-50'}`}>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            </div>
+        );
+    }
+
+    if (!session) {
+        return <LoginPage />;
+    }
+
     return (
         <div className={`flex h-screen overflow-hidden font-sans transition-colors duration-200 ${theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
             {/* Mobile Sidebar Toggle */}
@@ -1086,8 +1125,15 @@ const App = () => {
                 </div>
 
                 {/* Footer Area */}
-                <div className="px-4 py-3 bg-slate-950 text-xs text-slate-600 text-center shrink-0 border-t border-slate-900">
-                    {t.footer}
+                <div className="px-4 py-3 bg-slate-950 text-xs text-slate-600 shrink-0 border-t border-slate-900 flex items-center justify-between">
+                    <span>{t.footer}</span>
+                    <button
+                        onClick={handleLogout}
+                        className="p-1 hover:bg-slate-800 text-slate-600 hover:text-red-400 rounded transition-colors"
+                        title="Sign Out"
+                    >
+                        <LogOut size={14} />
+                    </button>
                 </div>
             </aside>
 
