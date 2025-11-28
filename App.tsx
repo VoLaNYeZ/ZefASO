@@ -171,7 +171,7 @@ const App = () => {
     }, [lang]);
 
     // -- UI State --
-    const [currentPage, setCurrentPage] = useState<'dashboard' | 'overview' | 'lab'>('dashboard');
+    const [currentPage, setCurrentPage] = useState<'dashboard' | 'overview' | 'lab'>('overview');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);

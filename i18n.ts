@@ -133,7 +133,7 @@ export const translations = {
         addSingleEntry: 'Add Single Entry',
 
         // Footer
-        footer: 'ПокаНеПридумал Alpha 1.6',
+        footer: 'ПокаНеПридумал Alpha v1.7',
 
         // Missing Keys
         allIds: 'All IDs',
@@ -236,7 +236,7 @@ export const translations = {
         onDay1: 'в 1-й день',
         noSuccessPatterns: 'Успешные шаблоны не найдены',
         noSuccessPatternsDesc: 'Не найдено случаев, когда приложение поднялось с >10 места на 1 место в выбранных данных.',
-        successStories: 'Приложения, дошедшии до 1-ой позиции',
+        successStories: 'Приложения, дошедшие до 1-ой позиции',
         selectBestRuns: 'Выбери прилы для модели выше.',
         selected: 'выбрано',
         available: 'доступно',
@@ -278,7 +278,7 @@ export const translations = {
         addSingleEntry: 'Добавить запись',
 
         // Footer
-        footer: 'ПокаНеПридумал Alpha 1.7',
+        footer: 'ПокаНеПридумал Alpha v1.7',
 
         // Missing Keys
         allIds: 'Все ID',
