@@ -215,8 +215,9 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
 
                 // Parse ranking
                 let ranking = 0;
-                const rawRank = cols[6].toLowerCase();
-                if (rawRank !== 'no data' && rawRank !== 'nan' && rawRank !== '') {
+                const rawRank = cols[6].toLowerCase().trim();
+                // Check for "no data", "no date", "nan", or empty string
+                if (!rawRank.includes('no data') && !rawRank.includes('no date') && rawRank !== 'nan' && rawRank !== '') {
                     const parsed = parseInt(cols[6]);
                     if (!isNaN(parsed)) ranking = parsed;
                 }

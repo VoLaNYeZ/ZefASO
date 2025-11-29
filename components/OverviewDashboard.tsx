@@ -11,7 +11,8 @@ import {
     Sparkles,
     Globe,
     Type,
-    LayoutTemplate
+    LayoutTemplate,
+    LayoutGrid
 } from 'lucide-react';
 import { AsoEntry } from '../types';
 import { DateRangePicker } from './DateRangePicker';
@@ -289,12 +290,17 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     const activeAppsCount = aggregatedData.length;
 
     return (
-        <div className="p-6 pb-20 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
+        <div className="p-6 pb-20 pt-16 md:pt-6 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
 
             {/* Header & Controls */}
             <div className="flex flex-col xl:flex-row gap-6 justify-between items-start xl:items-end">
                 <div>
-                    <h2 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight mb-1">{t.overview}</h2>
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="p-2 bg-gradient-to-br from-fuchsia-500 to-pink-500 rounded-lg">
+                            <LayoutGrid size={24} className="text-white" />
+                        </div>
+                        <h2 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">{t.overview}</h2>
+                    </div>
                     <p className="text-slate-500 dark:text-slate-400 font-medium">{t.overviewDescription}</p>
                 </div>
 
@@ -320,8 +326,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                         <button
                             onClick={() => setQuickDate('lastMonth')}
                             className={`px-3 py-2 text-xs font-bold rounded-lg transition-colors border ${isLastMonth
-                                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
-                                    : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
                                 }`}
                         >
                             {t.lastMonth}
@@ -329,8 +335,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                         <button
                             onClick={() => setQuickDate('thisMonth')}
                             className={`px-3 py-2 text-xs font-bold rounded-lg transition-colors border ${isThisMonth
-                                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
-                                    : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
                                 }`}
                         >
                             {t.thisMonth}

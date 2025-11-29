@@ -142,7 +142,7 @@ export const ComparisonDashboard: React.FC<ComparisonDashboardProps> = ({ data, 
 
 
     return (
-        <div className="p-6 pb-20 max-w-[1600px] mx-auto min-h-full flex flex-col">
+        <div className="p-6 pb-20 pt-16 md:pt-6 max-w-[1600px] mx-auto min-h-full flex flex-col">
             {/* Header */}
             <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 shrink-0">
                 <div className="z-10">
@@ -155,35 +155,39 @@ export const ComparisonDashboard: React.FC<ComparisonDashboardProps> = ({ data, 
 
                 {/* Main Tab Switch - Modern & Noticeable Design */}
                 <div className="relative z-0 mt-4 md:mt-0">
-                    <div className="bg-white dark:bg-slate-900 p-1.5 rounded-xl flex items-center gap-1 shadow-lg border-2 border-slate-200 dark:border-slate-700 relative">
+                    <div className="bg-white dark:bg-slate-900 p-2 rounded-xl flex items-center gap-1.5 shadow-lg border-2 border-slate-200 dark:border-slate-700 relative">
                         {/* Sliding Background Indicator */}
                         <div
-                            className={`absolute top-1.5 bottom-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 transition-all duration-300 ease-out shadow-md ${activeTab === 'comparison'
-                                ? 'left-1.5 right-[50%]'
-                                : 'left-[50%] right-1.5'
+                            className={`absolute top-2 bottom-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 transition-all duration-300 ease-out shadow-md ${activeTab === 'comparison'
+                                ? 'left-2 right-[50%]'
+                                : 'left-[50%] right-2'
                                 }`}
                         />
 
                         <button
                             onClick={() => setActiveTab('comparison')}
-                            className={`relative z-10 flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${activeTab === 'comparison'
+                            className={`relative z-10 flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-sm font-bold transition-all duration-300 ${activeTab === 'comparison'
                                 ? 'text-white scale-105'
                                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:scale-105'
                                 }`}
                         >
-                            <GitCompare size={18} className={activeTab === 'comparison' ? 'animate-pulse' : ''} />
+                            <GitCompare size={20} className={activeTab === 'comparison' ? 'animate-pulse' : ''} />
                             <span>{t.comparison}</span>
                         </button>
 
                         <button
                             onClick={() => setActiveTab('optimization')}
-                            className={`relative z-10 flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${activeTab === 'optimization'
+                            className={`relative z-10 flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-sm font-bold transition-all duration-300 ${activeTab === 'optimization'
                                 ? 'text-white scale-105'
                                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:scale-105'
                                 }`}
                         >
-                            <Zap size={18} className={activeTab === 'optimization' ? 'animate-pulse' : ''} />
+                            <Zap size={24} className={`ml-4 ${activeTab === 'optimization' ? 'animate-pulse' : ''}`} />
                             <span>{t.optimization}</span>
+                            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${activeTab === 'optimization'
+                                ? 'bg-white/20 text-white'
+                                : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
+                                }`}>Beta</span>
                         </button>
                     </div>
                 </div>

@@ -54,6 +54,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
 
   // Aggregate data based on granularity
   const chartData = useMemo(() => {
+    // First pass: Group data
     const grouped = data.reduce((acc, curr) => {
       let key = curr.date;
       let displayDate = curr.date;
@@ -62,12 +63,12 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
 
       if (granularity === 'Weekly') {
         key = getMonday(dateObj);
-        displayDate = key; // We'll format this in the axis
+        displayDate = key;
       } else if (granularity === 'Monthly') {
-        key = curr.date.substring(0, 7); // YYYY-MM
+        key = curr.date.substring(0, 7);
         displayDate = key;
       } else if (granularity === 'Yearly') {
-        key = curr.date.substring(0, 4); // YYYY
+        key = curr.date.substring(0, 4);
         displayDate = key;
       }
 
@@ -88,7 +89,6 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
       acc[key].cost += (curr.installs * curr.cpi);
       acc[key].count += 1;
 
-      // Only include valid rankings (>0)
       if (curr.ranking > 0) {
         acc[key].rankSum += curr.ranking;
         acc[key].rankCount += 1;
@@ -97,25 +97,40 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
       return acc;
     }, {} as Record<string, GroupedData>);
 
+    // Calculate max rank for unranked placement
+    let maxRank = 0;
+    (Object.values(grouped) as GroupedData[]).forEach(item => {
+      if (item.rankCount > 0) {
+        const avg = Math.round(item.rankSum / item.rankCount);
+        if (avg > maxRank) maxRank = avg;
+      }
+    });
+
+    // Set unranked value to be slightly below the worst rank (or 100 if no data)
+    const UNRANKED_VALUE = maxRank > 0 ? maxRank + 20 : 100;
+
     return (Object.values(grouped) as GroupedData[])
       .map(item => ({
         ...item,
-        // Calculate average ranking for the period
-        ranking: item.rankCount > 0 ? Math.round(item.rankSum / item.rankCount) : null,
-        cost: parseFloat(item.cost.toFixed(2))
+        // If we have valid ranks, use average. If not, but we have data (unranked), use UNRANKED_VALUE
+        ranking: item.rankCount > 0
+          ? Math.round(item.rankSum / item.rankCount)
+          : (item.count > 0 ? UNRANKED_VALUE : null),
+        cost: parseFloat(item.cost.toFixed(2)),
+        isUnranked: item.rankCount === 0 && item.count > 0
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [data, granularity]);
 
   const xAxisFormatter = (val: string) => {
-    if (granularity === 'Daily') return val.slice(5); // MM-DD
-    if (granularity === 'Weekly') return val.slice(5); // MM-DD (Start of week)
+    if (granularity === 'Daily') return val.slice(5);
+    if (granularity === 'Weekly') return val.slice(5);
     if (granularity === 'Monthly') {
       const [y, m] = val.split('-');
       const date = new Date(parseInt(y), parseInt(m) - 1);
-      return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }); // Nov 24
+      return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
     }
-    return val; // YYYY
+    return val;
   };
 
   if (chartData.length === 0) {
@@ -215,18 +230,19 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
                 content={({ active, payload, label }) => {
                   if (!active || !payload || !payload.length) return null;
 
-                  // Check if any payload has rank 1
                   const hasRank1 = payload.find(p => p.dataKey === 'ranking' && p.value === 1);
                   const formattedLabel = xAxisFormatter(label);
+                  // @ts-ignore
+                  const isUnranked = payload[0]?.payload?.isUnranked;
 
                   return (
                     <div className={`rounded-xl border shadow-sm backdrop-blur-md ${hasRank1
-                        ? 'bg-amber-50/90 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/50'
-                        : 'bg-white/90 border-slate-200 dark:bg-slate-800/90 dark:border-slate-700'
+                      ? 'bg-amber-50/90 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/50'
+                      : 'bg-white/90 border-slate-200 dark:bg-slate-800/90 dark:border-slate-700'
                       }`}>
                       <div className={`px-3 py-2 border-b text-xs font-semibold ${hasRank1
-                          ? 'border-amber-200 text-amber-700 dark:border-amber-700/50 dark:text-amber-400'
-                          : 'border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400'
+                        ? 'border-amber-200 text-amber-700 dark:border-amber-700/50 dark:text-amber-400'
+                        : 'border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400'
                         }`}>
                         {formattedLabel}
                         {hasRank1 && <span className="ml-2 text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-bold">★ #1 Rank</span>}
@@ -237,8 +253,8 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
                             <span className="text-slate-500 dark:text-slate-400 font-medium">
                               {entry.name}:
                             </span>
-                            <span className="font-bold text-slate-700 dark:text-slate-200">
-                              {entry.value === null ? 'No Data' : `#${entry.value}`}
+                            <span className={`font-bold ${isUnranked ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>
+                              {isUnranked ? 'Unranked' : `#${entry.value}`}
                             </span>
                           </div>
                         ))}
@@ -254,7 +270,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
                 strokeWidth={2}
                 connectNulls={false}
                 dot={(props: any) => {
-                  const { cx, cy, value } = props;
+                  const { cx, cy, value, payload } = props;
                   if (value === 1) {
                     return (
                       <svg x={cx - 8} y={cy - 8} width={16} height={16} viewBox="0 0 16 16" className="overflow-visible">
@@ -262,6 +278,9 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
                         <circle cx="8" cy="8" r="4" fill="#fbbf24" stroke="white" strokeWidth="1.5" />
                       </svg>
                     );
+                  }
+                  if (payload.isUnranked) {
+                    return <circle cx={cx} cy={cy} r={4} fill="#ef4444" strokeWidth={0} />;
                   }
                   return <circle cx={cx} cy={cy} r={4} fill="#f59e0b" strokeWidth={0} />;
                 }}

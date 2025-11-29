@@ -820,14 +820,11 @@ const App = () => {
                         </div>
                     </button>
 
-                    <div className="h-px bg-slate-800 my-2"></div>
-
-                    <button
-                        onClick={openCreateCategory}
-                        className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-lg transition-all border border-slate-700 hover:border-slate-500"
-                    >
-                        <FolderPlus size={14} /> {t.newFolder}
-                    </button>
+                    <div className="flex items-center gap-3 px-3 mt-4 mb-1">
+                        <div className="h-px bg-slate-800 flex-1"></div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t.activeApps}</span>
+                        <div className="h-px bg-slate-800 flex-1"></div>
+                    </div>
                 </div>
 
                 {/* Active Apps List - Scrollable with Categories */}
@@ -1094,13 +1091,25 @@ const App = () => {
                         </div>
                     )}
 
-                    {/* Add Data Button */}
-                    <button
-                        onClick={() => setIsUploadModalOpen(true)}
-                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white px-4 py-3 rounded-xl font-bold transition-all shadow-lg shadow-indigo-900/20 active:scale-95 border border-indigo-500/20"
-                    >
-                        <Plus size={18} /> {t.addNewData}
-                    </button>
+                    {/* Add Data & Folder Buttons */}
+                    <div className="flex items-center gap-2">
+                        {/* New Folder Button */}
+                        <button
+                            onClick={() => setCategoryModal({ isOpen: true, mode: 'create', targetName: '', inputValue: '' })}
+                            className="shrink-0 w-12 h-12 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl border border-slate-700 transition-all active:scale-95"
+                            title={t.createCategory}
+                        >
+                            <FolderPlus size={20} />
+                        </button>
+
+                        {/* Add Data Button */}
+                        <button
+                            onClick={() => setIsUploadModalOpen(true)}
+                            className="flex-1 h-12 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white px-4 rounded-xl font-bold text-sm whitespace-nowrap transition-all shadow-lg shadow-indigo-900/20 active:scale-95 border border-indigo-500/20"
+                        >
+                            <Plus size={18} /> {t.addNewData}
+                        </button>
+                    </div>
 
                     {/* Language & Theme Controls */}
                     <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/50">
@@ -1174,7 +1183,7 @@ const App = () => {
                     <>
                         {/* Dashboard Header */}
                         <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm z-20 transition-colors duration-200">
-                            <div className="px-6 py-4">
+                            <div className="px-6 py-4 pt-16 md:pt-4">
                                 <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4">
                                     <div>
                                         <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-3">
@@ -1418,7 +1427,9 @@ const App = () => {
                                                 }
                                             </div>
                                             <div>
-                                                <p className={`text-sm font-medium ${summary.rank === 1 ? "text-slate-400" : "opacity-70"}`}>Avg. Ranking</p>
+                                                <p className={`text-sm font-medium ${summary.rank === 1 ? "text-slate-400" : "opacity-70"}`}>
+                                                    {summary.keywordCount === 1 && summary.geoCount === 1 ? 'Latest Ranking' : 'Avg. Ranking'}
+                                                </p>
                                                 <h3 className="text-2xl font-bold">
                                                     {summary.rank > 0 ? `#${summary.rank}` : '-'}
                                                 </h3>
