@@ -75,9 +75,15 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
         // Handle DD/MM/YYYY
         if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanStr)) {
             const [day, month, year] = cleanStr.split('/');
-            // Pad single digits
             const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-            // Validate it's a real date
+            const d = new Date(isoDate);
+            if (!isNaN(d.getTime())) return isoDate;
+        }
+
+        // Handle YYYY/MM/DD
+        if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(cleanStr)) {
+            const [year, month, day] = cleanStr.split('/');
+            const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
             const d = new Date(isoDate);
             if (!isNaN(d.getTime())) return isoDate;
         }
@@ -179,6 +185,11 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
             // Determine separator: usually tab from Sheets/Excel, or comma from CSV
             const separator = line.includes('\t') ? '\t' : ',';
             const cols = line.split(separator).map(c => c.trim().replace(/^"|"$/g, '')); // trim whitespace and quotes
+
+            // Skip empty lines or lines with just separators
+            if (!line.trim() || cols.every(c => !c)) {
+                return;
+            }
 
             // Expected: Date | App Name | GEO | ID | Keyword | Last Plan | Ranking | Installs | [CPI]
 

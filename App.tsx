@@ -347,19 +347,27 @@ const App = () => {
         let rawId = '';
         if (filters.appId !== 'All') {
             rawId = filters.appId;
-        } else if (availableAppIds.length > 0) {
-            rawId = availableAppIds[0];
+        } else if (filters.appName) {
+            // Find the latest App ID for the selected App Name based on date
+            const appEntries = data.filter(d => d.appName === filters.appName);
+            if (appEntries.length > 0) {
+                // Sort by date descending to get the most recent entry
+                const latestEntry = appEntries.reduce((prev, current) =>
+                    (prev.date > current.date) ? prev : current
+                );
+                rawId = latestEntry.appId;
+            }
         }
         // Extract numbers from strings like "App Name 123456"
         const match = rawId.match(/(\d+)/);
         return match ? match[0] : null;
-    }, [filters.appId, availableAppIds]);
+    }, [filters.appId, filters.appName, data]);
 
     // -- Fetch App Icon Effect --
     useEffect(() => {
         const fetchIcon = async () => {
-            // If we already have an icon, skip
-            if (!filters.appName || !currentNumericId || appIcons[filters.appName]) return;
+            // Skip if no app selected or no ID found
+            if (!filters.appName || !currentNumericId) return;
 
             // 1. Collect countries to try based on data
             const countriesToTry = new Set<string>();
@@ -390,10 +398,12 @@ const App = () => {
                         if (itunesData.resultCount > 0) {
                             const result = itunesData.results[0];
                             const iconUrl = result.artworkUrl512 || result.artworkUrl100 || result.artworkUrl60;
-                            if (iconUrl) {
+
+                            // Only update if the icon is different to avoid loops/unnecessary saves
+                            if (iconUrl && iconUrl !== appIcons[filters.appName]) {
                                 setAppIcons(prev => ({ ...prev, [filters.appName!]: iconUrl }));
-                                return; // Stop once found
                             }
+                            return; // Stop once found
                         }
                     }
                 } catch (e) {
@@ -403,7 +413,7 @@ const App = () => {
         };
 
         fetchIcon();
-    }, [filters.appName, currentNumericId, availableGeos]);
+    }, [filters.appName, currentNumericId, availableGeos, appIcons]);
 
 
     const getStoreUrl = (geo: string, id: string) => {
