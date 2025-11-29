@@ -28,33 +28,33 @@ export const LoginPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-            <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+            <div className="max-w-md w-full bg-slate-900 rounded-2xl shadow-xl border border-slate-800 overflow-hidden">
                 <div className="p-8">
                     <div className="text-center mb-8">
                         <div className="w-16 h-16 bg-indigo-600 rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/30">
                             <Lock className="text-white" size={32} />
                         </div>
-                        <h1 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Welcome Back</h1>
-                        <p className="text-slate-500 dark:text-slate-400">Sign in to access your dashboard</p>
+                        <h1 className="text-2xl font-black text-white mb-2">Welcome Back</h1>
+                        <p className="text-slate-400">Sign in to access your dashboard</p>
                     </div>
 
                     {error && (
-                        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3">
-                            <AlertCircle className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" size={18} />
-                            <p className="text-sm text-red-600 dark:text-red-400 font-medium">{error}</p>
+                        <div className="mb-6 p-4 bg-red-900/20 border border-red-800 rounded-xl flex items-start gap-3">
+                            <AlertCircle className="text-red-400 shrink-0 mt-0.5" size={18} />
+                            <p className="text-sm text-red-400 font-medium">{error}</p>
                         </div>
                     )}
 
                     <form onSubmit={handleLogin} className="space-y-5">
                         <div className="space-y-1.5">
-                            <label className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Email</label>
+                            <label className="text-sm font-bold text-slate-300 ml-1">Email</label>
                             <div className="relative">
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-800 dark:text-white font-medium"
+                                    className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-white font-medium"
                                     placeholder="name@company.com"
                                     required
                                 />
@@ -63,13 +63,13 @@ export const LoginPage: React.FC = () => {
                         </div>
 
                         <div className="space-y-1.5">
-                            <label className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Password</label>
+                            <label className="text-sm font-bold text-slate-300 ml-1">Password</label>
                             <div className="relative">
                                 <input
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-800 dark:text-white font-medium"
+                                    className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-white font-medium"
                                     placeholder="••••••••"
                                     required
                                 />
@@ -93,7 +93,7 @@ export const LoginPage: React.FC = () => {
                         </button>
                     </form>
                 </div>
-                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 text-center">
+                <div className="p-4 bg-slate-800/50 border-t border-slate-800 text-center">
                     <p className="text-xs text-slate-400 font-medium">Protected by hawks • Жив, цел, орёл 🦅</p>
                 </div>
             </div>

@@ -61,6 +61,7 @@ import { ComparisonDashboard } from './components/ComparisonDashboard';
 import { supabase } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
+import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences } from './lib/supabaseService';
 
 const App = () => {
     // -- Auth State --
@@ -83,104 +84,100 @@ const App = () => {
     }, []);
 
     // -- State: Data Persistence --
-    const [data, setData] = useState<AsoEntry[]>(() => {
-        try {
-            const saved = localStorage.getItem('aso_data');
-            return saved ? JSON.parse(saved) : INITIAL_DATA;
-        } catch (e) {
-            console.error("Failed to load data", e);
-            return INITIAL_DATA;
+    const [dataLoading, setDataLoading] = useState(true);
+    const [data, setData] = useState<AsoEntry[]>([]);
+    const [hiddenApps, setHiddenApps] = useState<string[]>([]);
+    const [appIcons, setAppIcons] = useState<Record<string, string>>({});
+    const [categories, setCategories] = useState<string[]>(['General']);
+    const [collapsedCategories, setCollapsedCategories] = useState<string[]>([]);
+    const [appCategoryMap, setAppCategoryMap] = useState<Record<string, string>>({});
+    const [lang, setLang] = useState<'en' | 'ru'>('en');
+    const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+    // Track if we've already loaded data to prevent reloading on tab switch
+    const hasLoadedData = useRef(false);
+    const currentUserId = useRef<string | null>(null);
+
+    // Load initial data from Supabase when authenticated
+    useEffect(() => {
+        if (!session) {
+            setDataLoading(false);
+            hasLoadedData.current = false;
+            currentUserId.current = null;
+            return;
         }
-    });
 
-    const [hiddenApps, setHiddenApps] = useState<string[]>(() => {
-        try {
-            const saved = localStorage.getItem('aso_hidden_apps');
-            return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-            return [];
+        const userId = session.user.id;
+
+        // Only load data if we haven't loaded for this user yet
+        if (hasLoadedData.current && currentUserId.current === userId) {
+            return;
         }
-    });
 
-    // Persist Icons: map App Name -> Icon URL
-    const [appIcons, setAppIcons] = useState<Record<string, string>>(() => {
-        try {
-            const saved = localStorage.getItem('aso_app_icons');
-            return saved ? JSON.parse(saved) : {};
-        } catch (e) {
-            return {};
-        }
-    });
+        const loadInitialData = async () => {
+            setDataLoading(true);
+            try {
+                const [asoData, appSettings, userPrefs] = await Promise.all([
+                    loadAsoData(),
+                    loadAppSettings(),
+                    loadUserPreferences()
+                ]);
 
-    // Categories State
-    const [categories, setCategories] = useState<string[]>(() => {
-        try {
-            const saved = localStorage.getItem('aso_categories');
-            return saved ? JSON.parse(saved) : ['General'];
-        } catch (e) {
-            return ['General'];
-        }
-    });
+                setData(asoData.length > 0 ? asoData : INITIAL_DATA);
+                setAppIcons(appSettings.appIcons);
+                setCategories(appSettings.categories);
+                setAppCategoryMap(appSettings.appCategoryMap);
+                setCollapsedCategories(appSettings.collapsedCategories);
+                setHiddenApps(userPrefs.hiddenApps);
+                setLang(userPrefs.lang);
+                setTheme(userPrefs.theme);
 
-    const [collapsedCategories, setCollapsedCategories] = useState<string[]>(() => {
-        try {
-            const saved = localStorage.getItem('aso_collapsed_categories');
-            return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-            return [];
-        }
-    });
+                hasLoadedData.current = true;
+                currentUserId.current = userId;
+            } catch (error) {
+                console.error('Error loading data from Supabase:', error);
+                // Fallback to INITIAL_DATA on error
+                setData(INITIAL_DATA);
+            } finally {
+                setDataLoading(false);
+            }
+        };
 
-    const [appCategoryMap, setAppCategoryMap] = useState<Record<string, string>>(() => {
-        try {
-            const saved = localStorage.getItem('aso_app_category_map');
-            return saved ? JSON.parse(saved) : {};
-        } catch (e) {
-            return {};
-        }
-    });
+        loadInitialData();
+    }, [session]);
 
-    // -- Settings State (Lang & Theme) --
-    const [lang, setLang] = useState<'en' | 'ru'>(() => {
-        return (localStorage.getItem('aso_lang') as 'en' | 'ru') || 'en';
-    });
-
-    const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-        return (localStorage.getItem('aso_theme') as 'light' | 'dark') || 'light';
-    });
-
-    // Save to LocalStorage whenever data changes
+    // Save to Supabase whenever data changes (debounced)
     useEffect(() => {
-        localStorage.setItem('aso_data', JSON.stringify(data));
-    }, [data]);
+        if (!session || dataLoading) return;
+        const timer = setTimeout(() => {
+            saveAsoData(data);
+        }, 1000); // Debounce saves by 1 second
+        return () => clearTimeout(timer);
+    }, [data, session, dataLoading]);
 
     useEffect(() => {
-        localStorage.setItem('aso_hidden_apps', JSON.stringify(hiddenApps));
-    }, [hiddenApps]);
+        if (!session || dataLoading) return;
+        const timer = setTimeout(() => {
+            saveAppSettings({
+                appIcons,
+                categories,
+                appCategoryMap,
+                collapsedCategories
+            });
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, [appIcons, categories, appCategoryMap, collapsedCategories, session, dataLoading]);
 
     useEffect(() => {
-        localStorage.setItem('aso_app_icons', JSON.stringify(appIcons));
-    }, [appIcons]);
+        if (!session || dataLoading) return;
+        const timer = setTimeout(() => {
+            saveUserPreferences({ lang, theme, hiddenApps });
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, [lang, theme, hiddenApps, session, dataLoading]);
 
+    // Theme Effects
     useEffect(() => {
-        localStorage.setItem('aso_categories', JSON.stringify(categories));
-    }, [categories]);
-
-    useEffect(() => {
-        localStorage.setItem('aso_app_category_map', JSON.stringify(appCategoryMap));
-    }, [appCategoryMap]);
-
-    useEffect(() => {
-        localStorage.setItem('aso_collapsed_categories', JSON.stringify(collapsedCategories));
-    }, [collapsedCategories]);
-
-    // Settings Effects
-    useEffect(() => {
-        localStorage.setItem('aso_lang', lang);
-    }, [lang]);
-
-    useEffect(() => {
-        localStorage.setItem('aso_theme', theme);
         if (theme === 'dark') {
             document.documentElement.classList.add('dark');
         } else {
@@ -742,7 +739,7 @@ const App = () => {
         await supabase.auth.signOut();
     };
 
-    if (authLoading) {
+    if (authLoading || dataLoading) {
         return (
             <div className={`flex h-screen items-center justify-center ${theme === 'dark' ? 'bg-slate-950' : 'bg-slate-50'}`}>
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>

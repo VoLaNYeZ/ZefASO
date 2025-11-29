@@ -91,6 +91,82 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
         return null;
     };
 
+    // Normalize country names to ISO codes
+    const normalizeGeoCode = (geo: string): string => {
+        const trimmed = geo.trim();
+
+        // Common country name mappings
+        const countryMap: Record<string, string> = {
+            // Full names to codes
+            'Australia': 'AU', 'australia': 'AU',
+            'Finland': 'FI', 'finland': 'FI',
+            'Austria': 'AT', 'austria': 'AT',
+            'Netherlands': 'NL', 'netherlands': 'NL',
+            'Portugal': 'PT', 'portugal': 'PT',
+            'Sweden': 'SE', 'sweden': 'SE',
+            'United States': 'US', 'united states': 'US',
+            'United Kingdom': 'GB', 'united kingdom': 'GB', 'UK': 'GB', 'uk': 'GB',
+            'Germany': 'DE', 'germany': 'DE',
+            'France': 'FR', 'france': 'FR',
+            'Spain': 'ES', 'spain': 'ES',
+            'Italy': 'IT', 'italy': 'IT',
+            'Canada': 'CA', 'canada': 'CA',
+            'Japan': 'JP', 'japan': 'JP',
+            'China': 'CN', 'china': 'CN',
+            'Brazil': 'BR', 'brazil': 'BR',
+            'India': 'IN', 'india': 'IN',
+            'Mexico': 'MX', 'mexico': 'MX',
+            'South Korea': 'KR', 'south korea': 'KR',
+            'Russia': 'RU', 'russia': 'RU',
+            'Turkey': 'TR', 'turkey': 'TR',
+            'Poland': 'PL', 'poland': 'PL',
+            'Belgium': 'BE', 'belgium': 'BE',
+            'Denmark': 'DK', 'denmark': 'DK',
+            'Norway': 'NO', 'norway': 'NO',
+            'Switzerland': 'CH', 'switzerland': 'CH',
+            'Ireland': 'IE', 'ireland': 'IE',
+            'New Zealand': 'NZ', 'new zealand': 'NZ',
+            'Singapore': 'SG', 'singapore': 'SG',
+            'Hong Kong': 'HK', 'hong kong': 'HK',
+            'South Africa': 'ZA', 'south africa': 'ZA',
+            'Argentina': 'AR', 'argentina': 'AR',
+            'Chile': 'CL', 'chile': 'CL',
+            'Colombia': 'CO', 'colombia': 'CO',
+            'Peru': 'PE', 'peru': 'PE',
+            'Thailand': 'TH', 'thailand': 'TH',
+            'Vietnam': 'VN', 'vietnam': 'VN',
+            'Philippines': 'PH', 'philippines': 'PH',
+            'Indonesia': 'ID', 'indonesia': 'ID',
+            'Malaysia': 'MY', 'malaysia': 'MY',
+            'Taiwan': 'TW', 'taiwan': 'TW',
+            'Greece': 'GR', 'greece': 'GR',
+            'Czech Republic': 'CZ', 'czech republic': 'CZ',
+            'Romania': 'RO', 'romania': 'RO',
+            'Hungary': 'HU', 'hungary': 'HU',
+            'Slovakia': 'SK', 'slovakia': 'SK',
+            'Croatia': 'HR', 'croatia': 'HR',
+            'Israel': 'IL', 'israel': 'IL',
+            'UAE': 'AE', 'uae': 'AE', 'United Arab Emirates': 'AE',
+            'Saudi Arabia': 'SA', 'saudi arabia': 'SA',
+            'Egypt': 'EG', 'egypt': 'EG',
+            'Ukraine': 'UA', 'ukraine': 'UA',
+        };
+
+        // Check if it's a full name that needs conversion
+        if (countryMap[trimmed]) {
+            return countryMap[trimmed];
+        }
+
+        // If it's already a code (2-3 letters), return uppercase
+        if (trimmed.length <= 3) {
+            return trimmed.toUpperCase();
+        }
+
+        // If no mapping found, return as-is but log it
+        console.warn(`Unknown country name: "${trimmed}" - using as-is`);
+        return trimmed;
+    };
+
     const parseAndSubmit = (text: string, forcedAppName?: string) => {
         const lines = text.trim().split('\n');
         const newEntries: AsoEntry[] = [];
@@ -144,7 +220,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                         id: `import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                         date: date,
                         appName: sidebarAppName,
-                        geo: cols[2].trim() || 'Unknown',
+                        geo: normalizeGeoCode(cols[2]) || 'Unknown',
                         appId: compositeId,
                         keyword: cols[4].trim() || 'None',
                         ranking: ranking, // 0 means unranked/no data
