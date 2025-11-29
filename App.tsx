@@ -741,7 +741,7 @@ const App = () => {
 
     if (authLoading || dataLoading) {
         return (
-            <div className={`flex h-screen items-center justify-center ${theme === 'dark' ? 'bg-slate-950' : 'bg-slate-50'}`}>
+            <div className="flex h-screen items-center justify-center bg-slate-950">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
             </div>
         );

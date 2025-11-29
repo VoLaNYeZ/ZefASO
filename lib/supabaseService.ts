@@ -26,6 +26,7 @@ export const loadAsoData = async (): Promise<AsoEntry[]> => {
 
     // Transform database format to app format
     return (data || []).map(row => ({
+        id: row.id.toString(),
         date: row.date,
         appName: row.app_name,
         appId: row.app_id,
