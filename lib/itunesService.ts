@@ -115,3 +115,52 @@ export const itunesQueue = new RequestQueue();
 export const fetchAppRank = (term: string, country: string, appId: string) => {
     return itunesQueue.add(term, country, appId);
 };
+
+// Top 5 Apps feature
+export interface Top5App {
+    rank: number;
+    trackId: number;
+    trackName: string;
+    artworkUrl100: string;
+    averageUserRating: number;
+    userRatingCount: number;
+    screenshotUrls: string[];
+    description: string;
+    sellerName: string;
+    genres: string[];
+    trackViewUrl: string;
+}
+
+export const fetchTop5Apps = async (term: string, country: string): Promise<Top5App[]> => {
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=${country}&entity=software&limit=200`;
+
+    console.log(`[iTunes Top5] Fetching top 5 for "${term}" in ${country}`);
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`iTunes API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (data.resultCount === 0) return [];
+
+    // Take first 5 results and map to Top5App interface
+    const top5 = data.results.slice(0, 5).map((app: any, index: number) => ({
+        rank: index + 1,
+        trackId: app.trackId,
+        trackName: app.trackName || 'Unknown App',
+        artworkUrl100: app.artworkUrl100 || app.artworkUrl512 || app.artworkUrl60 || '',
+        averageUserRating: app.averageUserRating || 0,
+        userRatingCount: app.userRatingCount || 0,
+        screenshotUrls: app.screenshotUrls || [],
+        description: app.description || app.trackCensoredName || '',
+        sellerName: app.sellerName || app.artistName || 'Unknown',
+        genres: app.genres || [],
+        trackViewUrl: app.trackViewUrl || `https://apps.apple.com/app/id${app.trackId}`
+    }));
+
+    console.log(`[iTunes Top5] Found ${top5.length} apps`);
+
+    return top5;
+};

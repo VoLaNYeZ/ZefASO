@@ -21,6 +21,7 @@ interface DashboardChartsProps {
   granularity: Granularity;
   viewMode: 'full' | 'mini';
   theme: 'light' | 'dark';
+  translations?: any;
 }
 
 interface GroupedData {
@@ -43,7 +44,7 @@ const getMonday = (d: Date) => {
   return monday.toISOString().split('T')[0];
 };
 
-export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currencySymbol = '$', granularity, viewMode, theme }) => {
+export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currencySymbol = '$', granularity, viewMode, theme, translations }) => {
 
   // Theme Colors
   const axisColor = theme === 'dark' ? '#94a3b8' : '#64748b';
@@ -204,7 +205,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
 
       {/* Graph 2: Ranking */}
       <div className={chartContainerClass}>
-        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Avg. App Store Ranking</h3>
+        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">{translations?.avgAppStoreRanking || 'Avg. App Store Ranking'}</h3>
         <div className={`${chartHeightClass} w-full`}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>

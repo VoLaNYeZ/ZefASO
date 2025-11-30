@@ -142,7 +142,28 @@ export const translations = {
         overviewSub: 'Track performance & KPIs',
         labSub: 'Experiment & Compare',
         overviewDescription: 'Global performance across all your applications.',
-        labDescription: 'Experiment, compare, and build optimal growth models.'
+        labDescription: 'Experiment, compare, and build optimal growth models.',
+
+        // Dashboard Stats
+        dailyInstalls: 'Daily Installs',
+        avgRanking: 'Avg. Ranking',
+        totalCost: 'Total Cost',
+        dailyCosts: 'Daily Costs',
+        avgAppStoreRanking: 'Avg. App Store Ranking',
+        across: 'across',
+        keywords: 'keywords',
+        geos: 'Geos',
+
+        // Real-Time Standings
+        realTimeStandings: 'Real-Time Standings',
+        refreshAll: 'Refresh All',
+
+        // Top 5 Feature
+        viewTop5: 'View Top 5',
+        top5Apps: 'Top 5 Apps',
+        inGeo: 'in',
+        rating: 'Rating',
+        screenshots: 'Screenshots'
     },
     ru: {
         // Navigation & General
@@ -155,7 +176,7 @@ export const translations = {
         hiddenArchived: 'Скрытые / Архив',
         addNewData: 'Добавить данные',
         dashboard: 'Дашборд',
-        store: 'Магазин',
+        store: 'В сторе',
         settings: 'Настройки',
 
         // Time & Date
@@ -287,7 +308,28 @@ export const translations = {
         overviewSub: 'Отслеживание KPI',
         labSub: 'Сравнение и оптимизация',
         overviewDescription: 'Глобальная производительность всех ваших приложений.',
-        labDescription: 'Экспериментируем, сравниваем и создаем оптимальные модели роста.'
+        labDescription: 'Экспериментируем, сравниваем и создаем оптимальные модели роста.',
+
+        // Dashboard Stats
+        dailyInstalls: 'По ранкам',
+        avgRanking: 'Ср. позиция',
+        totalCost: 'Общий расход',
+        dailyCosts: 'Расходы по дням',
+        avgAppStoreRanking: 'Средняя позиция в App Store',
+        across: 'по',
+        keywords: 'ключам',
+        geos: 'гео',
+
+        // Real-Time Standings
+        realTimeStandings: 'Позиции в реальном времени',
+        refreshAll: 'Обновить все',
+
+        // Top 5 Feature
+        viewTop5: 'Топ 5',
+        top5Apps: 'Топ 5 приложений',
+        inGeo: 'в',
+        rating: 'Рейтинг',
+        screenshots: 'Скриншоты'
     }
 };
 

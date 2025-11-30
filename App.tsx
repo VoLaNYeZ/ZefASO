@@ -1356,7 +1356,7 @@ const App = () => {
                                             onChange={(e) => setFilters(prev => ({ ...prev, appId: e.target.value }))}
                                             style={{ minWidth: '0' }}
                                         >
-                                            <option value="All">All IDs</option>
+                                            <option value="All">{t.allIds}</option>
                                             {availableAppIds.map(id => (
                                                 <option key={id} value={id}>{id}</option>
                                             ))}
@@ -1427,7 +1427,7 @@ const App = () => {
                                             value={filters.keyword}
                                             onChange={(e) => setFilters(prev => ({ ...prev, keyword: e.target.value }))}
                                         >
-                                            <option value="All">All Keywords</option>
+                                            <option value="All">{t.allKeywords}</option>
                                             {availableKeywords.map(k => (
                                                 <option key={k} value={k}>{k}</option>
                                             ))}
@@ -1557,6 +1557,7 @@ const App = () => {
                                 granularity={granularity}
                                 viewMode={viewMode}
                                 theme={theme}
+                                translations={t}
                             />
 
                             {/* Real-Time Standings Section */}
@@ -1587,6 +1588,7 @@ const App = () => {
                                             items={itemsForLatestApp}
                                             getCountryFlag={getCountryFlag}
                                             theme={theme}
+                                            translations={t}
                                         />
                                     </div>
                                 );

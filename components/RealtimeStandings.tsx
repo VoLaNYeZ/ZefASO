@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Clock, AlertCircle, CheckCircle2, Trophy } from 'lucide-react';
-import { fetchAppRank } from '../lib/itunesService';
+import { RefreshCw, Clock, AlertCircle, CheckCircle2, Trophy, Eye } from 'lucide-react';
+import { fetchAppRank, fetchTop5Apps, Top5App } from '../lib/itunesService';
 import { loadRealtimeRankings, saveRealtimeRanking, RealtimeRanking } from '../lib/supabaseService';
+import Top5Modal from './Top5Modal';
 
 interface RealtimeStandingsProps {
     appId: string;
@@ -10,6 +11,7 @@ interface RealtimeStandingsProps {
     items: { keyword: string; geo: string }[];
     getCountryFlag: (geo: string) => string;
     theme: 'light' | 'dark';
+    translations?: any;
 }
 
 export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
@@ -18,11 +20,19 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
     appIcon,
     items,
     getCountryFlag,
-    theme
+    theme,
+    translations
 }) => {
     const [rankings, setRankings] = useState<Record<string, RealtimeRanking>>({});
     const [loadingState, setLoadingState] = useState<Record<string, boolean>>({});
     const [isGlobalLoading, setIsGlobalLoading] = useState(false);
+
+    // Top 5 Modal State
+    const [isTop5ModalOpen, setIsTop5ModalOpen] = useState(false);
+    const [top5Apps, setTop5Apps] = useState<Top5App[]>([]);
+    const [top5Loading, setTop5Loading] = useState(false);
+    const [top5Error, setTop5Error] = useState<string | null>(null);
+    const [selectedKeywordGeo, setSelectedKeywordGeo] = useState<{ keyword: string; geo: string } | null>(null);
 
     // Load saved rankings on mount
     useEffect(() => {
@@ -81,6 +91,24 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
         setIsGlobalLoading(false);
     };
 
+    const handleViewTop5 = async (keyword: string, geo: string) => {
+        setSelectedKeywordGeo({ keyword, geo });
+        setIsTop5ModalOpen(true);
+        setTop5Loading(true);
+        setTop5Error(null);
+        setTop5Apps([]);
+
+        try {
+            const apps = await fetchTop5Apps(keyword, geo);
+            setTop5Apps(apps);
+        } catch (error) {
+            console.error(`Failed to fetch top 5 for ${keyword} in ${geo}`, error);
+            setTop5Error('Failed to load top 5 apps. Please try again.');
+        } finally {
+            setTop5Loading(false);
+        }
+    };
+
     // Group items by Geo
     const groupedItems: Record<string, string[]> = {};
     items.forEach(item => {
@@ -104,7 +132,7 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
                 <div className="flex items-center gap-3">
                     <Trophy className="text-indigo-500" size={24} />
                     <div className="flex flex-col">
-                        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Real-Time Standings</h2>
+                        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{translations?.realTimeStandings || 'Real-Time Standings'}</h2>
                         <div className="flex items-center gap-2 mt-1">
                             {appIcon && (
                                 <img src={appIcon} alt={appName} className="w-6 h-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm object-cover" />
@@ -123,7 +151,7 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
                         }`}
                 >
                     <RefreshCw size={16} className={isGlobalLoading ? 'animate-spin' : ''} />
-                    {isGlobalLoading ? 'Refreshing All (Queued)...' : 'Refresh All'}
+                    {isGlobalLoading ? `${translations?.refreshAll || 'Refresh All'} (Queued)...` : translations?.refreshAll || 'Refresh All'}
                 </button>
             </div>
 
@@ -184,6 +212,16 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
                                             >
                                                 <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
                                             </button>
+
+                                            {/* View Top 5 Button */}
+                                            <button
+                                                onClick={() => handleViewTop5(keyword, geo)}
+                                                disabled={isGlobalLoading}
+                                                className="p-1.5 text-slate-400 hover:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-md transition-colors disabled:opacity-50"
+                                                title={translations?.viewTop5 || 'View Top 5'}
+                                            >
+                                                <Eye size={14} />
+                                            </button>
                                         </div>
                                     </div>
                                 );
@@ -192,6 +230,19 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
                     </div>
                 ))}
             </div>
+
+            {/* Top 5 Modal */}
+            <Top5Modal
+                isOpen={isTop5ModalOpen}
+                onClose={() => setIsTop5ModalOpen(false)}
+                apps={top5Apps}
+                keyword={selectedKeywordGeo?.keyword || ''}
+                geo={selectedKeywordGeo?.geo || ''}
+                isLoading={top5Loading}
+                error={top5Error}
+                getCountryFlag={getCountryFlag}
+                translations={translations}
+            />
         </div>
     );
 };
