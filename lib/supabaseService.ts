@@ -180,3 +180,60 @@ export const saveUserPreferences = async (prefs: UserPreferences): Promise<void>
         console.error('Error saving user preferences:', error);
     }
 };
+
+// ============================================
+// Real-Time Rankings
+// ============================================
+
+export interface RealtimeRanking {
+    id?: string;
+    appId: string;
+    keyword: string;
+    geo: string;
+    rank: number | null;
+    lastUpdated: string;
+}
+
+export const loadRealtimeRankings = async (appId: string): Promise<RealtimeRanking[]> => {
+    const userId = await getUserId();
+    const { data, error } = await supabase
+        .from('realtime_rankings')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('app_id', appId);
+
+    if (error) {
+        console.error('Error loading realtime rankings:', error);
+        return [];
+    }
+
+    return (data || []).map(row => ({
+        id: row.id,
+        appId: row.app_id,
+        keyword: row.keyword,
+        geo: row.geo,
+        rank: row.rank,
+        lastUpdated: row.last_updated
+    }));
+};
+
+export const saveRealtimeRanking = async (ranking: RealtimeRanking): Promise<void> => {
+    const userId = await getUserId();
+
+    const { error } = await supabase
+        .from('realtime_rankings')
+        .upsert({
+            user_id: userId,
+            app_id: ranking.appId,
+            keyword: ranking.keyword,
+            geo: ranking.geo,
+            rank: ranking.rank,
+            last_updated: new Date().toISOString()
+        }, {
+            onConflict: 'user_id,app_id,keyword,geo'
+        });
+
+    if (error) {
+        console.error('Error saving realtime ranking:', error);
+    }
+};

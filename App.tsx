@@ -57,6 +57,7 @@ import { DataUploadModal } from './components/DataUploadModal';
 import { DateRangePicker } from './components/DateRangePicker';
 import { analyzeASOTrends } from './services/geminiService';
 import { OverviewDashboard } from './components/OverviewDashboard';
+import { RealtimeStandings } from './components/RealtimeStandings';
 import { ComparisonDashboard } from './components/ComparisonDashboard';
 import { supabase } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
@@ -198,7 +199,8 @@ const App = () => {
     const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
     const [isHiddenSectionOpen, setIsHiddenSectionOpen] = useState(false);
     const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
-    const [viewMode, setViewMode] = useState<'full' | 'mini'>('full');
+    const [deleteAllConfirmation, setDeleteAllConfirmation] = useState(false);
+    const [viewMode, setViewMode] = useState<'full' | 'mini'>('mini');
 
     // UI State for Moving Apps
     const [movingApp, setMovingApp] = useState<string | null>(null); // The app currently being moved
@@ -224,10 +226,40 @@ const App = () => {
     // -- Granularity State --
     const [granularity, setGranularity] = useState<Granularity>('Daily');
 
+    // -- App Resolution Logic (Merge by ID) --
+    const appResolution = useMemo(() => {
+        const idToName: Record<string, string> = {};
+        const nameToId: Record<string, string> = {};
+        const idToLatestDate: Record<string, string> = {};
+
+        // 1. Find the latest name for each App ID
+        data.forEach(item => {
+            if (!item.appId) return;
+
+            const existingDate = idToLatestDate[item.appId];
+            if (!existingDate || item.date > existingDate) {
+                idToLatestDate[item.appId] = item.date;
+                idToName[item.appId] = item.appName;
+            }
+        });
+
+        // 2. Build reverse map
+        Object.entries(idToName).forEach(([id, name]) => {
+            nameToId[name] = id;
+        });
+
+        return { idToName, nameToId };
+    }, [data]);
+
     // -- Derived Data --
     const uniqueApps = useMemo(() => {
-        return Array.from(new Set(data.map(item => item.appName))).sort();
-    }, [data]);
+        // Return only the canonical names (values of idToName)
+        // If an app has no ID (legacy?), fallback to its name
+        const withIds = new Set(Object.values(appResolution.idToName));
+        const withoutIds = data.filter(d => !d.appId).map(d => d.appName);
+
+        return Array.from(new Set([...withIds, ...withoutIds])).sort();
+    }, [data, appResolution]);
 
     const activeApps = useMemo(() => uniqueApps.filter(app => !hiddenApps.includes(app)), [uniqueApps, hiddenApps]);
     const archivedAppsList = useMemo(() => uniqueApps.filter(app => hiddenApps.includes(app)), [uniqueApps, hiddenApps]);
@@ -286,12 +318,17 @@ const App = () => {
     // Calculate Latest CPI for selected app
     const latestCPI = useMemo(() => {
         if (!filters.appName) return '0.09';
-        const appEntries = data.filter(d => d.appName === filters.appName);
+
+        const selectedAppId = appResolution.nameToId[filters.appName];
+
+        // Filter by ID if possible
+        const appEntries = data.filter(d => selectedAppId ? d.appId === selectedAppId : d.appName === filters.appName);
+
         if (appEntries.length === 0) return '0.09';
         // Find entry with latest date
         const latest = appEntries.reduce((prev, current) => (prev.date > current.date) ? prev : current);
         return latest.cpi.toString();
-    }, [data, filters.appName]);
+    }, [data, filters.appName, appResolution]);
 
     // Sync input with latest CPI
     useEffect(() => {
@@ -427,8 +464,17 @@ const App = () => {
     const filteredData = useMemo(() => {
         if (!filters.appName) return [];
 
+        // Resolve selected name to ID
+        const selectedAppId = appResolution.nameToId[filters.appName];
+
         let res = data.filter(item => {
-            if (item.appName !== filters.appName) return false;
+            // Filter by ID if we have one (merging duplicates), otherwise fallback to name
+            if (selectedAppId) {
+                if (item.appId !== selectedAppId) return false;
+            } else {
+                if (item.appName !== filters.appName) return false;
+            }
+
             if (filters.appId !== 'All' && item.appId !== filters.appId) return false;
             if (filters.geo !== 'All' && item.geo !== filters.geo) return false;
             if (filters.keyword !== 'All' && item.keyword !== filters.keyword) return false;
@@ -563,9 +609,10 @@ const App = () => {
         if (!deleteConfirmation) return;
 
         const appName = deleteConfirmation;
+        const appIdToDelete = appResolution.nameToId[appName];
 
-        // Filter out all entries for this app
-        const newData = data.filter(d => d.appName !== appName);
+        // Filter out all entries for this app (by ID if possible, else Name)
+        const newData = data.filter(d => appIdToDelete ? d.appId !== appIdToDelete : d.appName !== appName);
         setData(newData);
 
         // Remove from hidden list if present
@@ -604,6 +651,45 @@ const App = () => {
                 keyword: 'All'
             }));
         }
+    };
+
+    const requestDeleteAllApps = () => {
+        setDeleteAllConfirmation(true);
+    };
+
+    const confirmDeleteAllApps = () => {
+        if (!filters.appName) return;
+
+        const appNameToDelete = filters.appName;
+
+        // Wipe ALL data for this specific app name (regardless of ID)
+        setData(prev => prev.filter(d => d.appName !== appNameToDelete));
+
+        // Remove icon
+        const newIcons = { ...appIcons };
+        delete newIcons[appNameToDelete];
+        setAppIcons(newIcons);
+
+        // Remove from categories
+        setCategories(prev => prev); // Categories themselves don't need changing, just the map
+        const newCatMap = { ...appCategoryMap };
+        delete newCatMap[appNameToDelete];
+        setAppCategoryMap(newCatMap);
+
+        // Remove from hidden apps
+        setHiddenApps(prev => prev.filter(app => app !== appNameToDelete));
+
+        // Reset filters
+        setFilters({
+            appName: null,
+            appId: 'All',
+            geo: 'All',
+            keyword: 'All',
+            startDate: new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            endDate: new Date().toISOString().split('T')[0]
+        });
+
+        setDeleteAllConfirmation(false);
     };
 
     const handleToggleArchive = (e: React.MouseEvent, appToToggle: string) => {
@@ -1229,18 +1315,18 @@ const App = () => {
                                         {/* View Toggle */}
                                         <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
                                             <button
-                                                onClick={() => setViewMode('full')}
-                                                className={`p-1.5 rounded-md transition-all ${viewMode === 'full' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-                                                title="Full View"
-                                            >
-                                                <LayoutList size={16} />
-                                            </button>
-                                            <button
                                                 onClick={() => setViewMode('mini')}
                                                 className={`p-1.5 rounded-md transition-all ${viewMode === 'mini' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                                                 title="Mini View"
                                             >
                                                 <Layout size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => setViewMode('full')}
+                                                className={`p-1.5 rounded-md transition-all ${viewMode === 'full' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                                                title="Full View"
+                                            >
+                                                <LayoutList size={16} />
                                             </button>
                                         </div>
 
@@ -1473,6 +1559,39 @@ const App = () => {
                                 theme={theme}
                             />
 
+                            {/* Real-Time Standings Section */}
+                            {filters.appName && (() => {
+                                // Find ALL entries for this app (ignoring filters) to get the truly latest one
+                                const allAppEntries = data.filter(d => d.appName === filters.appName);
+                                if (allAppEntries.length === 0) return null;
+
+                                // Get the latest entry by date
+                                const latestEntry = allAppEntries.reduce((latest, current) => {
+                                    return new Date(current.date) > new Date(latest.date) ? current : latest;
+                                }, allAppEntries[0]);
+
+                                // Get all unique keyword/geo pairs for this specific app+id combination
+                                const itemsForLatestApp = data
+                                    .filter(d => d.appName === filters.appName && d.appId === latestEntry.appId)
+                                    .map(d => ({ keyword: d.keyword, geo: d.geo }))
+                                    .filter((item, index, self) =>
+                                        index === self.findIndex(t => t.keyword === item.keyword && t.geo === item.geo)
+                                    );
+
+                                return (
+                                    <div className="mt-8">
+                                        <RealtimeStandings
+                                            appId={latestEntry.appId}
+                                            appName={filters.appName}
+                                            appIcon={appIcons[filters.appName]}
+                                            items={itemsForLatestApp}
+                                            getCountryFlag={getCountryFlag}
+                                            theme={theme}
+                                        />
+                                    </div>
+                                );
+                            })()}
+
                             {/* AI Analysis Section */}
                             {aiAnalysis && (
                                 <div className="mt-8 bg-white dark:bg-slate-900 rounded-2xl border border-indigo-100 dark:border-indigo-900 shadow-lg overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -1540,13 +1659,22 @@ const App = () => {
                                         <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-100 dark:border-red-900/30 flex flex-col justify-center items-start">
                                             <h5 className="text-sm font-bold text-red-800 dark:text-red-400 mb-1">{t.dangerZone}</h5>
                                             <p className="text-xs text-red-600 dark:text-red-300 mb-3">{t.permanentlyRemove}</p>
-                                            <button
-                                                onClick={requestDeleteApp}
-                                                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 transition-colors text-sm font-medium shadow-sm"
-                                            >
-                                                <Trash2 size={16} />
-                                                {t.deleteApp}
-                                            </button>
+                                            <div className="flex flex-col gap-2 w-full">
+                                                <button
+                                                    onClick={requestDeleteApp}
+                                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 transition-colors text-sm font-medium shadow-sm w-full"
+                                                >
+                                                    <Trash2 size={16} />
+                                                    {t.deleteApp}
+                                                </button>
+                                                <button
+                                                    onClick={requestDeleteAllApps}
+                                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-red-800 border border-red-800 text-white rounded-lg hover:bg-red-700 hover:border-red-700 transition-colors text-sm font-medium shadow-sm w-full"
+                                                >
+                                                    <AlertTriangle size={16} />
+                                                    Delete All {filters.appName} Data
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1593,6 +1721,38 @@ const App = () => {
                                     className="px-5 py-2.5 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 shadow-lg shadow-red-500/30 transition-colors"
                                 >
                                     Yes, Delete it
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete ALL Confirmation Modal */}
+            {deleteAllConfirmation && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden scale-100 animate-in zoom-in-95 duration-200 border dark:border-slate-800">
+                        <div className="p-6 text-center">
+                            <div className="w-16 h-16 bg-red-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-500/30 animate-pulse">
+                                <AlertTriangle size={32} />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Delete All {filters.appName} Data?</h3>
+                            <p className="text-slate-600 dark:text-slate-400 mb-6">
+                                Are you sure you want to delete <strong className="text-red-600 dark:text-red-400">ALL DATA</strong> for <span className="font-bold">{filters.appName}</span>?<br />
+                                <span className="font-bold text-red-600 dark:text-red-400">This will remove all versions and IDs for this app.</span>
+                            </p>
+                            <div className="flex gap-3 justify-center">
+                                <button
+                                    onClick={() => setDeleteAllConfirmation(false)}
+                                    className="px-5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDeleteAllApps}
+                                    className="px-5 py-2.5 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 shadow-lg shadow-red-500/30 transition-colors"
+                                >
+                                    Yes, Delete All
                                 </button>
                             </div>
                         </div>

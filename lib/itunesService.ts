@@ -1,0 +1,117 @@
+
+// Queue system to respect iTunes API rate limits (approx 20 req/min)
+// We'll use a 3-second delay between requests to be safe.
+
+type QueueItem = {
+    term: string;
+    country: string;
+    appId: string;
+    resolve: (rank: number | null) => void;
+    reject: (error: any) => void;
+};
+
+class RequestQueue {
+    private queue: QueueItem[] = [];
+    private isProcessing = false;
+    private delayMs = 3000; // 3 seconds delay
+
+    add(term: string, country: string, appId: string): Promise<number | null> {
+        return new Promise((resolve, reject) => {
+            this.queue.push({ term, country, appId, resolve, reject });
+            this.process();
+        });
+    }
+
+    private async process() {
+        if (this.isProcessing || this.queue.length === 0) return;
+
+        this.isProcessing = true;
+        const item = this.queue.shift();
+
+        if (item) {
+            try {
+                const rank = await this.fetchRankFromApi(item.term, item.country, item.appId);
+                item.resolve(rank);
+            } catch (error) {
+                console.error(`Error fetching rank for ${item.term} in ${item.country}:`, error);
+                item.resolve(null); // Resolve with null on error to keep queue moving
+            }
+
+            // Wait before processing next item
+            setTimeout(() => {
+                this.isProcessing = false;
+                this.process();
+            }, this.delayMs);
+        } else {
+            this.isProcessing = false;
+        }
+    }
+
+    private async fetchRankFromApi(term: string, country: string, rawAppId: string): Promise<number | null> {
+        // Sanitize App ID: It might be "AppName AppID" or just "AppID"
+        // We take the last part after splitting by space to get the ID/BundleID
+        const parts = rawAppId.trim().split(' ');
+        const targetAppId = parts[parts.length - 1];
+
+        // iTunes Search API
+        // limit=200 to find the app in top 200. If not found, we assume unranked (or > 200).
+        const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=${country}&entity=software&limit=200`;
+
+        console.log(`[iTunes] -----------------------------------------------------------`);
+        console.log(`[iTunes] Fetching: ${url}`);
+        console.log(`[iTunes] Raw App ID: '${rawAppId}' -> Target App ID: '${targetAppId}'`);
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            console.error(`[iTunes] API Error: ${response.status} ${response.statusText}`);
+            throw new Error(`iTunes API error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        console.log(`[iTunes] Search for "${term}" in ${country} returned ${data.resultCount} results.`);
+
+        if (data.resultCount === 0) return null;
+
+        // Debug: Log the first result to see structure
+        if (data.results.length > 0) {
+            const first = data.results[0];
+            console.log(`[iTunes] First result: "${first.trackName}" (ID: ${first.trackId}, Bundle: ${first.bundleId})`);
+        }
+
+        // Find index of our app
+        // Check both trackId (numeric) and bundleId (string)
+        const trimmedTargetId = targetAppId.trim();
+
+        const index = data.results.findIndex((app: any) => {
+            const appTrackId = String(app.trackId || '').trim();
+            const appBundleId = (app.bundleId || '').trim();
+
+            const matchId = appTrackId === trimmedTargetId;
+            const matchBundle = appBundleId === trimmedTargetId;
+
+            return matchId || matchBundle;
+        });
+
+        if (index !== -1) {
+            const foundApp = data.results[index];
+            console.log(`[iTunes] ✅ MATCH FOUND at rank ${index + 1}: "${foundApp.trackName}" (ID: ${foundApp.trackId})`);
+            return index + 1; // Rank is 1-based
+        }
+
+        // Not found - log first 10 results to help debug
+        console.log(`[iTunes] ❌ App not found in top 200. Looking for ID: '${trimmedTargetId}'`);
+        console.log(`[iTunes] First 10 results for debugging:`);
+        data.results.slice(0, 10).forEach((app: any, i: number) => {
+            console.log(`  ${i + 1}. "${app.trackName}" - ID: ${app.trackId}, Bundle: ${app.bundleId || 'N/A'}`);
+        });
+
+        return null; // Not found in top 200
+    }
+}
+
+export const itunesQueue = new RequestQueue();
+
+export const fetchAppRank = (term: string, country: string, appId: string) => {
+    return itunesQueue.add(term, country, appId);
+};
