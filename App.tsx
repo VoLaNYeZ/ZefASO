@@ -1096,7 +1096,7 @@ const App = () => {
                         {/* New Folder Button */}
                         <button
                             onClick={() => setCategoryModal({ isOpen: true, mode: 'create', targetName: '', inputValue: '' })}
-                            className="shrink-0 w-12 h-12 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl border border-slate-700 transition-all active:scale-95"
+                            className="shrink-0 w-12 min-h-[3rem] flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl border border-slate-700 transition-all active:scale-95"
                             title={t.createCategory}
                         >
                             <FolderPlus size={20} />
@@ -1105,9 +1105,10 @@ const App = () => {
                         {/* Add Data Button */}
                         <button
                             onClick={() => setIsUploadModalOpen(true)}
-                            className="flex-1 h-12 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white px-4 rounded-xl font-bold text-sm whitespace-nowrap transition-all shadow-lg shadow-indigo-900/20 active:scale-95 border border-indigo-500/20"
+                            className="flex-1 min-h-[3rem] flex items-center justify-center gap-1.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white px-2 py-1 rounded-xl font-bold text-xs leading-tight text-center whitespace-normal transition-all shadow-lg shadow-indigo-900/20 active:scale-95 border border-indigo-500/20"
                         >
-                            <Plus size={18} /> {t.addNewData}
+                            <Plus size={16} className="shrink-0" />
+                            <span>{t.addNewData}</span>
                         </button>
                     </div>
 
@@ -1183,24 +1184,24 @@ const App = () => {
                     <>
                         {/* Dashboard Header */}
                         <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm z-20 transition-colors duration-200">
-                            <div className="px-6 py-4 pt-16 md:pt-4">
-                                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4">
-                                    <div>
-                                        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-3">
+                            <div className="px-4 py-3 pt-16 md:pt-4">
+                                <div className="flex flex-row items-center justify-between gap-2 mb-3">
+                                    <div className="min-w-0 flex-1">
+                                        <h1 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 md:gap-3 truncate">
                                             {/* Main Header Icon */}
                                             {filters.appName && appIcons[filters.appName] && (
                                                 <img
                                                     src={appIcons[filters.appName]}
                                                     alt={`${filters.appName} icon`}
-                                                    className="w-10 h-10 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm object-cover"
+                                                    className="w-8 h-8 md:w-10 md:h-10 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm object-cover shrink-0"
                                                 />
                                             )}
-                                            {filters.appName || t.dashboard}
+                                            <span className="truncate">{filters.appName || t.dashboard}</span>
                                         </h1>
 
-                                        {/* App Store Link Section */}
+                                        {/* App Store Link Section - Hidden on very small screens if needed, or kept compact */}
                                         {filters.appName && currentNumericId && (
-                                            <div className="flex items-center gap-3 mt-2 text-sm ml-[3.25rem]">
+                                            <div className="hidden sm:flex items-center gap-3 mt-1 text-sm ml-[2.75rem] md:ml-[3.25rem]">
                                                 <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t.store}:</span>
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {availableGeos.map(geo => (
@@ -1222,84 +1223,79 @@ const App = () => {
                                                 </div>
                                             </div>
                                         )}
-
-                                        {!filters.appName && (
-                                            <p className="text-sm text-slate-500 mt-1">
-                                                Performance Overview & Optimization Insights
-                                            </p>
-                                        )}
                                     </div>
 
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2 shrink-0">
                                         {/* View Toggle */}
-                                        <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 mr-2">
+                                        <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
                                             <button
                                                 onClick={() => setViewMode('full')}
                                                 className={`p-1.5 rounded-md transition-all ${viewMode === 'full' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                                                 title="Full View"
                                             >
-                                                <LayoutList size={18} />
+                                                <LayoutList size={16} />
                                             </button>
                                             <button
                                                 onClick={() => setViewMode('mini')}
                                                 className={`p-1.5 rounded-md transition-all ${viewMode === 'mini' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                                                 title="Mini View"
                                             >
-                                                <Layout size={18} />
+                                                <Layout size={16} />
                                             </button>
                                         </div>
 
                                         <button
                                             onClick={runAnalysis}
                                             disabled={isAnalyzing || filteredData.length === 0}
-                                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:shadow-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:shadow-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                                         >
-                                            <BrainCircuit size={18} />
-                                            {isAnalyzing ? t.analyzing : t.aiAnalysis}
+                                            <BrainCircuit size={16} />
+                                            <span className="hidden sm:inline">{isAnalyzing ? t.analyzing : t.aiAnalysis}</span>
+                                            <span className="sm:hidden">{t.aiAnalysis.split(' ')[0]}</span> {/* Show shorter text on mobile */}
                                         </button>
                                     </div>
                                 </div>
 
                                 {/* Filters Bar - Adaptive Layout */}
-                                <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center bg-slate-50 dark:bg-slate-800 p-2 rounded-xl border border-slate-100 dark:border-slate-700">
+                                <div className="grid grid-cols-2 lg:flex lg:flex-row gap-2 items-center bg-slate-50 dark:bg-slate-800 p-2 rounded-xl border border-slate-100 dark:border-slate-700">
 
                                     {/* App ID Select */}
-                                    <div className="relative group w-full lg:w-auto">
-                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-indigo-500 transition-colors pointer-events-none">
-                                            <Hash size={16} />
+                                    <div className="relative group w-full lg:w-auto col-span-1">
+                                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-indigo-500 transition-colors pointer-events-none">
+                                            <Hash size={14} />
                                         </div>
                                         <select
-                                            className="w-full appearance-none pl-10 pr-8 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:border-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer shadow-sm truncate"
+                                            className="w-full appearance-none pl-8 pr-6 py-1.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-xs md:text-sm font-medium text-slate-700 dark:text-slate-200 hover:border-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer shadow-sm truncate"
                                             value={filters.appId}
                                             onChange={(e) => setFilters(prev => ({ ...prev, appId: e.target.value }))}
-                                            style={{ minWidth: '160px', maxWidth: '300px' }}
+                                            style={{ minWidth: '0' }}
                                         >
-                                            <option value="All">All App IDs</option>
+                                            <option value="All">All IDs</option>
                                             {availableAppIds.map(id => (
                                                 <option key={id} value={id}>{id}</option>
                                             ))}
                                         </select>
-                                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                                     </div>
 
                                     {/* GEO Select (With Flags) */}
-                                    <div className="relative group w-full sm:w-auto">
-                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-indigo-500 transition-colors pointer-events-none z-10">
-                                            <Globe size={16} />
+                                    <div className="relative group w-full lg:w-auto col-span-1">
+                                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-indigo-500 transition-colors pointer-events-none z-10">
+                                            <Globe size={14} />
                                         </div>
 
                                         {/* Custom Visual Display for Selected Value */}
-                                        <div className="w-full sm:w-auto min-w-[140px] pl-10 pr-8 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm flex items-center gap-2">
+                                        <div className="w-full lg:w-auto min-w-0 pl-8 pr-6 py-1.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-xs md:text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm flex items-center gap-1.5 truncate">
                                             {filters.geo === 'All' ? (
-                                                <span>🌍 All GEOs</span>
+                                                <span className="truncate">🌍 All GEOs</span>
                                             ) : (
                                                 <>
                                                     <img
                                                         src={getCountryFlag(filters.geo)}
                                                         alt={filters.geo}
-                                                        className="w-5 h-3.5 object-contain rounded-[2px]"
+                                                        className="w-4 h-3 object-contain rounded-[2px] shrink-0"
                                                     />
-                                                    <span>{filters.geo}</span>
+                                                    <span className="truncate">{filters.geo}</span>
                                                 </>
                                             )}
                                         </div>
@@ -1314,16 +1310,16 @@ const App = () => {
                                                 <option key={geo} value={geo} className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200">{geo}</option>
                                             ))}
                                         </select>
-                                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" />
+                                        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" />
                                     </div>
 
                                     {/* Granularity Selector */}
-                                    <div className="relative group w-full sm:w-auto">
-                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-indigo-500 transition-colors pointer-events-none">
-                                            <CalendarClock size={16} />
+                                    <div className="relative group w-full lg:w-auto col-span-1">
+                                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-indigo-500 transition-colors pointer-events-none">
+                                            <CalendarClock size={14} />
                                         </div>
                                         <select
-                                            className="w-full appearance-none pl-10 pr-8 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:border-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer shadow-sm"
+                                            className="w-full appearance-none pl-8 pr-6 py-1.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-xs md:text-sm font-medium text-slate-700 dark:text-slate-200 hover:border-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer shadow-sm"
                                             value={granularity}
                                             onChange={(e) => setGranularity(e.target.value as Granularity)}
                                         >
@@ -1332,27 +1328,16 @@ const App = () => {
                                             <option value="Monthly">{t.monthly}</option>
                                             <option value="Yearly">{t.yearly}</option>
                                         </select>
-                                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                                     </div>
 
-                                    {/* Date Range Picker */}
-                                    <div className="w-full sm:w-auto">
-                                        <DateRangePicker
-                                            startDate={filters.startDate}
-                                            endDate={filters.endDate}
-                                            onChange={(s, e) => setFilters(prev => ({ ...prev, startDate: s, endDate: e }))}
-                                            theme={theme}
-                                            t={t}
-                                        />
-                                    </div>
-
-                                    {/* Keywords - Push to end or wrap */}
-                                    <div className="relative group w-full lg:w-auto lg:ml-auto">
+                                    {/* Keywords */}
+                                    <div className="relative group w-full lg:w-auto col-span-1">
                                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-indigo-500 transition-colors pointer-events-none">
                                             <Search size={16} />
                                         </div>
                                         <select
-                                            className="w-full appearance-none pl-10 pr-8 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:border-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer shadow-sm max-w-full lg:max-w-[200px]"
+                                            className="w-full appearance-none pl-10 pr-8 py-1.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-xs md:text-sm font-medium text-slate-700 dark:text-slate-200 hover:border-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer shadow-sm"
                                             value={filters.keyword}
                                             onChange={(e) => setFilters(prev => ({ ...prev, keyword: e.target.value }))}
                                         >
@@ -1364,14 +1349,28 @@ const App = () => {
                                         <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                                     </div>
 
-                                    {/* Reset Filters Button */}
-                                    <button
-                                        onClick={resetAllFilters}
-                                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent hover:border-red-100 dark:hover:border-red-900"
-                                        title="Reset Filters"
-                                    >
-                                        <FilterX size={20} />
-                                    </button>
+                                    {/* Date Picker & Reset Wrapper */}
+                                    <div className="col-span-2 lg:col-span-1 lg:ml-auto flex items-center gap-2 w-full lg:w-auto">
+                                        {/* Date Range Picker */}
+                                        <div className="flex-1 lg:w-auto">
+                                            <DateRangePicker
+                                                startDate={filters.startDate}
+                                                endDate={filters.endDate}
+                                                onChange={(s, e) => setFilters(prev => ({ ...prev, startDate: s, endDate: e }))}
+                                                theme={theme}
+                                                t={t}
+                                            />
+                                        </div>
+
+                                        {/* Reset Filters Button */}
+                                        <button
+                                            onClick={resetAllFilters}
+                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 hover:border-red-200 dark:hover:border-red-800 bg-white dark:bg-slate-700 shadow-sm shrink-0"
+                                            title="Reset Filters"
+                                        >
+                                            <FilterX size={20} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </header>

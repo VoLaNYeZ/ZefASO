@@ -166,7 +166,7 @@ export const ComparisonDashboard: React.FC<ComparisonDashboardProps> = ({ data, 
 
                         <button
                             onClick={() => setActiveTab('comparison')}
-                            className={`relative z-10 flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-sm font-bold transition-all duration-300 ${activeTab === 'comparison'
+                            className={`relative z-10 flex items-center justify-center gap-2 pl-8 pr-4 py-3 rounded-lg text-sm font-bold transition-all duration-300 ${activeTab === 'comparison'
                                 ? 'text-white scale-105'
                                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:scale-105'
                                 }`}
@@ -177,7 +177,7 @@ export const ComparisonDashboard: React.FC<ComparisonDashboardProps> = ({ data, 
 
                         <button
                             onClick={() => setActiveTab('optimization')}
-                            className={`relative z-10 flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-sm font-bold transition-all duration-300 ${activeTab === 'optimization'
+                            className={`relative z-10 flex items-center justify-center gap-2 pl-8 pr-4 py-3 rounded-lg text-sm font-bold transition-all duration-300 ${activeTab === 'optimization'
                                 ? 'text-white scale-105'
                                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:scale-105'
                                 }`}

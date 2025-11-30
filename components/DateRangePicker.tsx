@@ -7,6 +7,7 @@ interface DateRangePickerProps {
   onChange: (start: string | null, end: string | null) => void;
   theme: 'light' | 'dark';
   t: any;
+  variant?: 'default' | 'compact' | 'overview'; // compact for Lab, overview for Overview dashboard
 }
 
 // Helpers
@@ -24,7 +25,7 @@ const toStr = (date: Date) => {
 const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
 const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
 
-export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, onChange, theme, t }) => {
+export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, onChange, theme, t, variant = 'default' }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -204,7 +205,16 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
     <div className="relative" ref={containerRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-500 transition-all focus:ring-2 focus:ring-indigo-500 outline-none w-full sm:w-auto shadow-sm"
+        className={`flex items-center gap-2 
+          ${variant === 'compact' ? 'px-3 py-1.5 text-xs' : variant === 'overview' ? 'px-3 py-2 text-xs' : 'px-3 py-1.5 text-xs md:text-sm'} 
+          bg-white 
+          ${variant === 'compact' ? 'dark:bg-slate-900' : variant === 'overview' ? 'dark:bg-slate-800' : 'dark:bg-slate-700'} 
+          border border-slate-200 
+          ${variant === 'compact' ? 'dark:border-slate-700' : variant === 'overview' ? 'dark:border-slate-700' : 'dark:border-slate-600'} 
+          ${variant === 'compact' ? 'rounded-md' : 'rounded-lg'} 
+          font-medium text-slate-700 
+          ${variant === 'compact' ? 'dark:text-slate-300' : variant === 'overview' ? 'dark:text-slate-200' : 'dark:text-slate-200'} 
+          hover:border-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer shadow-sm w-full lg:w-auto`}
       >
         <CalendarIcon size={16} className="text-slate-500 dark:text-slate-400" />
         <span className="flex-1 text-left truncate">{formatDisplay()}</span>

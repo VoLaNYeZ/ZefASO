@@ -11,7 +11,7 @@ import {
     ResponsiveContainer
 } from 'recharts';
 import { AsoEntry, ComparisonBlock } from '../types';
-import { X, Hash, Globe, Search, Download, DollarSign, Trophy, TrendingUp } from 'lucide-react';
+import { X, Hash, Globe, Search, Download, DollarSign, Trophy, TrendingUp, ChevronDown } from 'lucide-react';
 import { DateRangePicker } from './DateRangePicker';
 
 interface ComposedAppChartProps {
@@ -213,66 +213,44 @@ export const ComposedAppChart: React.FC<ComposedAppChartProps> = ({
                 <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-50/50 dark:bg-slate-800/50">
                     {/* ID */}
                     <div className="relative group min-w-[80px] flex-1">
-                        <Hash size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <Hash size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                         <select
                             value={block.appId}
                             onChange={(e) => onUpdate(block.id, 'appId', e.target.value)}
-                            className="w-full pl-7 pr-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-medium text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-600 outline-none cursor-pointer truncate"
+                            className="w-full appearance-none pl-7 pr-6 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-medium text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-600 outline-none cursor-pointer truncate"
                         >
                             <option value="All">{t.allIds}</option>
                             {availableIds.map(id => <option key={id} value={id}>{id}</option>)}
                         </select>
+                        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
 
                     {/* GEO */}
                     <div className="relative group min-w-[80px] flex-1">
-                        <Globe size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
-
-                        {/* Custom Visual Display for Selected Value */}
-                        <div className="absolute inset-0 pl-7 pr-2 py-1.5 flex items-center pointer-events-none">
-                            {block.geo === 'All' ? (
-                                <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{t.allGeos}</span>
-                            ) : (
-                                <div className="flex items-center gap-1.5">
-                                    <img
-                                        src={getCountryFlag(block.geo)}
-                                        alt={block.geo}
-                                        className="w-4 h-3 object-contain rounded-[1px]"
-                                    />
-                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{block.geo}</span>
-                                </div>
-                            )}
-                        </div>
-
+                        <Globe size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                         <select
                             value={block.geo}
                             onChange={(e) => onUpdate(block.id, 'geo', e.target.value)}
-                            className="w-full h-full absolute inset-0 opacity-0 cursor-pointer z-20 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200"
+                            className="w-full appearance-none pl-7 pr-6 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-medium text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-600 outline-none cursor-pointer truncate"
                         >
-                            <option value="All" className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200">{t.allGeos}</option>
-                            {availableGeos.map(geo => <option key={geo} value={geo} className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200">{geo}</option>)}
+                            <option value="All" className="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300">{t.allGeos}</option>
+                            {availableGeos.map(geo => <option key={geo} value={geo} className="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300">{geo}</option>)}
                         </select>
-
-                        {/* Placeholder to maintain height/width */}
-                        <div className="w-full pl-7 pr-2 py-1.5 opacity-0 pointer-events-none border border-transparent text-xs font-medium">
-                            {block.geo === 'All' ? t.allGeos : block.geo}
-                        </div>
-
-                        {/* Border Container */}
-                        <div className="absolute inset-0 border border-slate-200 dark:border-slate-700 rounded-md pointer-events-none group-hover:border-indigo-300 dark:group-hover:border-indigo-600 transition-colors"></div>
+                        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
 
                     {/* Keyword */}
                     <div className="relative group min-w-[100px] flex-[1.5]">
-                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                         <select
                             value={block.keyword}
                             onChange={(e) => onUpdate(block.id, 'keyword', e.target.value)}
-                            className="w-full pl-7 pr-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-medium text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-600 outline-none cursor-pointer truncate"
+                            className="w-full appearance-none pl-7 pr-6 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-medium text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-600 outline-none cursor-pointer truncate"
                         >
                             <option value="All">{t.allKeywords}</option>
                             {availableKeywords.map(kw => <option key={kw} value={kw}>{kw}</option>)}
                         </select>
+                        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
 
                     {/* Date Picker */}
@@ -286,6 +264,7 @@ export const ComposedAppChart: React.FC<ComposedAppChartProps> = ({
                             }}
                             theme={theme}
                             t={t}
+                            variant="compact"
                         />
                     </div>
                 </div>
@@ -335,12 +314,12 @@ export const ComposedAppChart: React.FC<ComposedAppChartProps> = ({
 
                                     return (
                                         <div className={`rounded-xl border shadow-sm backdrop-blur-md ${hasRank1
-                                                ? 'bg-amber-50/90 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/50'
-                                                : 'bg-white/90 border-slate-200 dark:bg-slate-800/90 dark:border-slate-700'
+                                            ? 'bg-amber-50/90 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/50'
+                                            : 'bg-white/90 border-slate-200 dark:bg-slate-800/90 dark:border-slate-700'
                                             }`}>
                                             <div className={`px-3 py-2 border-b text-xs font-semibold ${hasRank1
-                                                    ? 'border-amber-200 text-amber-700 dark:border-amber-700/50 dark:text-amber-400'
-                                                    : 'border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400'
+                                                ? 'border-amber-200 text-amber-700 dark:border-amber-700/50 dark:text-amber-400'
+                                                : 'border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400'
                                                 }`}>
                                                 {new Date(label).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                                                 {hasRank1 && <span className="ml-2 text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-bold">★ #1 Rank</span>}
