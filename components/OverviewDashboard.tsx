@@ -575,7 +575,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                             </div>
                         </div>
                         {/* Footer decoration */}
-                        <div className="h-1 w-full bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100"></div>
+                        <div className="h-1 w-full bg-gradient-to-r  from-slate-100 via-slate-200 to-slate-100  dark:from-slate-800 dark:via-slate-700 dark:to-slate-800" />
+
                     </div>
                 ))}
 
