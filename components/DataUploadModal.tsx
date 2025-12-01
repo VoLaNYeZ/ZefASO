@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Upload, Plus, FileText, CheckCircle, Smartphone, FolderPlus, Layers } from 'lucide-react';
+import { X, Upload, Plus, FileText, CheckCircle, Smartphone, FolderPlus, Layers, Table } from 'lucide-react';
+import { fetchSheetTabs, fetchSheetData, processSheetData } from '../services/googleSheets';
+import { supabase } from '../lib/supabase';
 import { AsoEntry } from '../types';
 import { DEFAULT_CPI } from '../constants';
 
@@ -14,7 +16,7 @@ interface DataUploadModalProps {
     t: any;
 }
 
-type ImportStrategy = 'existing' | 'new' | 'bulk';
+type ImportStrategy = 'existing' | 'new' | 'bulk' | 'sheets';
 type InputMethod = 'paste' | 'file' | 'manual';
 
 export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClose, onAddData, selectedApp, activeApps, existingDataKeys, theme, t }) => {
@@ -28,6 +30,14 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
     const [targetNewApp, setTargetNewApp] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [importStatus, setImportStatus] = useState<{ added: number, updated: number, skipped: number, dates: string[] } | null>(null);
+
+    // Google Sheets State
+    const [webAppUrl, setWebAppUrl] = useState('');
+    const [sheetTabs, setSheetTabs] = useState<string[]>([]);
+    const [selectedTabs, setSelectedTabs] = useState<Set<string>>(new Set());
+    const [isSyncEnabled, setIsSyncEnabled] = useState(false);
+    const [isFetchingTabs, setIsFetchingTabs] = useState(false);
+    const [isImportingSheet, setIsImportingSheet] = useState(false);
 
     // Manual Form State
     const [manualFormData, setManualFormData] = useState({
@@ -66,6 +76,10 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
         // Default back to reasonable defaults
         setStrategy('existing');
         setInputMethod('paste');
+        setWebAppUrl('');
+        setSheetTabs([]);
+        setSelectedTabs(new Set());
+        setIsSyncEnabled(false);
     };
 
     const parseDate = (dateStr: string): string | null => {
@@ -344,6 +358,89 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
         reader.readAsText(file);
     };
 
+    const handleFetchTabs = async () => {
+        if (!webAppUrl) {
+            alert("Please enter the Web App URL");
+            return;
+        }
+        setIsFetchingTabs(true);
+        try {
+            const tabs = await fetchSheetTabs(webAppUrl);
+            setSheetTabs(tabs);
+            setSelectedTabs(new Set(tabs)); // Select all by default
+        } catch (error: any) {
+            alert(`Failed to fetch tabs: ${error.message}`);
+        } finally {
+            setIsFetchingTabs(false);
+        }
+    };
+
+    const handleSheetImport = async () => {
+        if (selectedTabs.size === 0) {
+            alert("Please select at least one tab to import");
+            return;
+        }
+        setIsImportingSheet(true);
+        try {
+            let allEntries: AsoEntry[] = [];
+            let addedCount = 0;
+            let updatedCount = 0;
+            let skippedCount = 0;
+            const foundDates = new Set<string>();
+
+            for (const tab of selectedTabs) {
+                const data = await fetchSheetData(webAppUrl, tab);
+                const entries = processSheetData(data, tab);
+
+                entries.forEach(entry => {
+                    const key = `${entry.date}-${entry.appId}-${entry.geo}-${entry.keyword}`;
+                    if (existingDataKeys.has(key)) {
+                        updatedCount++;
+                    } else {
+                        addedCount++;
+                    }
+                    foundDates.add(entry.date);
+                });
+
+                allEntries = [...allEntries, ...entries];
+            }
+
+            if (allEntries.length > 0) {
+                onAddData(allEntries);
+                setImportStatus({
+                    added: addedCount,
+                    updated: updatedCount,
+                    skipped: skippedCount, // Note: processSheetData doesn't count skips explicitly, but we could improve this
+                    dates: Array.from(foundDates).sort()
+                });
+
+                // Save Sync Settings
+                if (isSyncEnabled) {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user) {
+                        const { error } = await supabase
+                            .from('google_sheets_sync')
+                            .upsert({
+                                user_id: user.id,
+                                web_app_url: webAppUrl,
+                                is_sync_enabled: true,
+                                selected_tabs: Array.from(selectedTabs),
+                                last_synced_at: new Date().toISOString()
+                            });
+                        if (error) console.error("Failed to save sync settings:", error);
+                    }
+                }
+            } else {
+                alert("No valid data found in selected tabs.");
+            }
+
+        } catch (error: any) {
+            alert(`Import failed: ${error.message}`);
+        } finally {
+            setIsImportingSheet(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col border border-slate-200 dark:border-slate-800">
@@ -405,7 +502,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                             {/* 1. Choose Target Strategy */}
                             <div className="mb-6">
                                 <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block mb-3">1. {t.whereDataGo}</label>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                     <button
                                         onClick={() => { setStrategy('existing'); setInputMethod('paste'); }}
                                         className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${strategy === 'existing'
@@ -437,6 +534,17 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                     >
                                         <Layers className="mb-2" size={24} />
                                         <span className="text-sm font-semibold">{t.smartBulk}</span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => { setStrategy('sheets'); setInputMethod('manual'); }}
+                                        className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${strategy === 'sheets'
+                                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
+                                            : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-200 dark:hover:border-slate-700'
+                                            }`}
+                                    >
+                                        <Table className="mb-2" size={24} />
+                                        <span className="text-sm font-semibold">Google Sheets</span>
                                     </button>
                                 </div>
                             </div>
@@ -487,32 +595,102 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                 </div>
                             )}
 
-                            {/* 2. Choose Input Method */}
-                            <div className="mb-4">
-                                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block mb-3">2. {t.dataSource}</label>
-                                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                                    <button
-                                        onClick={() => setInputMethod('paste')}
-                                        className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${inputMethod === 'paste' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
-                                    >
-                                        {t.pasteText}
-                                    </button>
-                                    <button
-                                        onClick={() => setInputMethod('file')}
-                                        className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${inputMethod === 'file' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
-                                    >
-                                        {t.csvFile}
-                                    </button>
-                                    {strategy !== 'bulk' && (
+                            {strategy === 'sheets' && (
+                                <div className="mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
+                                    <div>
+                                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase block mb-1">Google Apps Script Web App URL</label>
+                                        <input
+                                            value={webAppUrl}
+                                            onChange={(e) => setWebAppUrl(e.target.value)}
+                                            placeholder="https://script.google.com/macros/s/.../exec"
+                                            className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                                        />
+                                        <p className="text-xs text-slate-400 mt-1">Get this by deploying the Apps Script in your Google Sheet.</p>
+                                    </div>
+
+                                    {!sheetTabs.length ? (
                                         <button
-                                            onClick={() => setInputMethod('manual')}
-                                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${inputMethod === 'manual' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+                                            onClick={handleFetchTabs}
+                                            disabled={isFetchingTabs || !webAppUrl}
+                                            className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50"
                                         >
-                                            {t.manualEntry}
+                                            {isFetchingTabs ? 'Fetching Tabs...' : 'Fetch Tabs'}
                                         </button>
+                                    ) : (
+                                        <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block mb-2">Select Tabs (Apps)</label>
+                                            <div className="max-h-40 overflow-y-auto space-y-2 mb-4">
+                                                {sheetTabs.map(tab => (
+                                                    <label key={tab} className="flex items-center space-x-2 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedTabs.has(tab)}
+                                                            onChange={(e) => {
+                                                                const newSet = new Set(selectedTabs);
+                                                                if (e.target.checked) newSet.add(tab);
+                                                                else newSet.delete(tab);
+                                                                setSelectedTabs(newSet);
+                                                            }}
+                                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                        />
+                                                        <span className="text-sm text-slate-700 dark:text-slate-300">{tab}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+
+                                            <div className="flex items-center space-x-2 mb-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                                <input
+                                                    type="checkbox"
+                                                    id="autoSync"
+                                                    checked={isSyncEnabled}
+                                                    onChange={(e) => setIsSyncEnabled(e.target.checked)}
+                                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                />
+                                                <label htmlFor="autoSync" className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                                                    Automatic daily sync (on session start)
+                                                </label>
+                                            </div>
+
+                                            <button
+                                                onClick={handleSheetImport}
+                                                disabled={isImportingSheet || selectedTabs.size === 0}
+                                                className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                                            >
+                                                {isImportingSheet ? 'Importing...' : 'Import Selected Tabs'}
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
-                            </div>
+                            )}
+
+                            {/* 2. Choose Input Method (Hidden for Sheets) */}
+                            {strategy !== 'sheets' && (
+                                <div className="mb-4">
+                                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block mb-3">2. {t.dataSource}</label>
+                                    <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                                        <button
+                                            onClick={() => setInputMethod('paste')}
+                                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${inputMethod === 'paste' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+                                        >
+                                            {t.pasteText}
+                                        </button>
+                                        <button
+                                            onClick={() => setInputMethod('file')}
+                                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${inputMethod === 'file' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+                                        >
+                                            {t.csvFile}
+                                        </button>
+                                        {strategy !== 'bulk' && (
+                                            <button
+                                                onClick={() => setInputMethod('manual')}
+                                                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${inputMethod === 'manual' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+                                            >
+                                                {t.manualEntry}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Input Area */}
                             <div className="animate-in fade-in">
@@ -630,6 +808,6 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };

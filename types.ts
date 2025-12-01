@@ -28,6 +28,15 @@ export interface ChartDataPoint {
   ranking: number;
   cost: number;
   keyword: string;
+  collapsedCategories: string[];
+}
+
+export interface GoogleSheetSyncConfig {
+  user_id: string;
+  web_app_url: string;
+  is_sync_enabled: boolean;
+  last_synced_at?: string;
+  selected_tabs: string[];
 }
 
 export interface AppSummary {

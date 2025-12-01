@@ -48,6 +48,9 @@ class RequestQueue {
     }
 
     private async fetchRankFromApi(term: string, country: string, rawAppId: string): Promise<number | null> {
+        // Map UK to GB for iTunes API
+        const itunesCountry = country.toUpperCase() === 'UK' ? 'GB' : country;
+
         // Sanitize App ID: It might be "AppName AppID" or just "AppID"
         // We take the last part after splitting by space to get the ID/BundleID
         const parts = rawAppId.trim().split(' ');
@@ -55,7 +58,7 @@ class RequestQueue {
 
         // iTunes Search API
         // limit=200 to find the app in top 200. If not found, we assume unranked (or > 200).
-        const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=${country}&entity=software&limit=200`;
+        const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=${itunesCountry}&entity=software&limit=200`;
 
         console.log(`[iTunes] -----------------------------------------------------------`);
         console.log(`[iTunes] Fetching: ${url}`);
@@ -132,7 +135,10 @@ export interface Top5App {
 }
 
 export const fetchTop5Apps = async (term: string, country: string): Promise<Top5App[]> => {
-    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=${country}&entity=software&limit=200`;
+    // Map UK to GB for iTunes API
+    const itunesCountry = country.toUpperCase() === 'UK' ? 'GB' : country;
+
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=${itunesCountry}&entity=software&limit=200`;
 
     console.log(`[iTunes Top5] Fetching top 5 for "${term}" in ${country}`);
 

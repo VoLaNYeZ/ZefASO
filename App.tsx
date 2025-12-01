@@ -63,6 +63,7 @@ import { supabase } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
 import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences } from './lib/supabaseService';
+import { fetchSheetData, processSheetData } from './services/googleSheets';
 
 const App = () => {
     // -- Auth State --
@@ -146,6 +147,8 @@ const App = () => {
 
         loadInitialData();
     }, [session]);
+
+
 
     // Save to Supabase whenever data changes (debounced)
     useEffect(() => {
@@ -574,6 +577,67 @@ const App = () => {
             return Array.from(dataMap.values());
         });
     };
+
+    // -- Automatic Google Sheets Sync --
+    useEffect(() => {
+        if (!session || !currentUserId.current) return;
+
+        const runSync = async () => {
+            try {
+                const { data: syncSettings, error } = await supabase
+                    .from('google_sheets_sync')
+                    .select('*')
+                    .eq('user_id', session.user.id)
+                    .single();
+
+                if (error || !syncSettings || !syncSettings.is_sync_enabled) return;
+
+                const lastSynced = syncSettings.last_synced_at ? new Date(syncSettings.last_synced_at) : null;
+                const today = new Date();
+                const isSameDay = lastSynced &&
+                    lastSynced.getDate() === today.getDate() &&
+                    lastSynced.getMonth() === today.getMonth() &&
+                    lastSynced.getFullYear() === today.getFullYear();
+
+                if (isSameDay) return; // Already synced today
+
+                console.log("Running automatic Google Sheets sync...");
+                const tabs = syncSettings.selected_tabs as string[];
+                if (!tabs || tabs.length === 0) return;
+
+                let newEntries: AsoEntry[] = [];
+
+                for (const tab of tabs) {
+                    try {
+                        const sheetData = await fetchSheetData(syncSettings.web_app_url, tab);
+                        const entries = processSheetData(sheetData, tab);
+                        newEntries = [...newEntries, ...entries];
+                    } catch (e) {
+                        console.error(`Failed to sync tab ${tab}:`, e);
+                    }
+                }
+
+                if (newEntries.length > 0) {
+                    handleAddData(newEntries); // Merge into state
+
+                    // Update last_synced_at
+                    await supabase
+                        .from('google_sheets_sync')
+                        .update({ last_synced_at: new Date().toISOString() })
+                        .eq('user_id', session.user.id);
+
+                    console.log(`Synced ${newEntries.length} entries from Google Sheets.`);
+                }
+
+            } catch (err) {
+                console.error("Auto-sync failed:", err);
+            }
+        };
+
+        // Run sync shortly after load to avoid blocking initial render
+        const timer = setTimeout(runSync, 3000);
+        return () => clearTimeout(timer);
+    }, [session]);
 
     const handleRequestCPIUpdate = () => {
         if (!filters.appName) return;
