@@ -3,6 +3,9 @@
 -- Run this in your Supabase SQL Editor
 -- ============================================
 
+-- WARNING: This will delete existing sync settings!
+DROP TABLE IF EXISTS google_sheets_sync;
+
 CREATE TABLE IF NOT EXISTS google_sheets_sync (
   user_id UUID REFERENCES auth.users PRIMARY KEY,
   web_app_url TEXT NOT NULL,

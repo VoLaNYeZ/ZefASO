@@ -1,6 +1,21 @@
+import { supabase } from './supabase';
 
 // Queue system to respect iTunes API rate limits (approx 20 req/min)
 // We'll use a 3-second delay between requests to be safe.
+
+// Helper function to call iTunes API through Supabase Edge Function proxy
+async function fetchThroughProxy(itunesUrl: string): Promise<any> {
+    const { data, error } = await supabase.functions.invoke('itunes-proxy', {
+        body: { url: itunesUrl }
+    });
+
+    if (error) {
+        console.error('[iTunes Proxy] Error:', error);
+        throw new Error(`Proxy error: ${error.message}`);
+    }
+
+    return data;
+}
 
 type QueueItem = {
     term: string;
@@ -48,8 +63,15 @@ class RequestQueue {
     }
 
     private async fetchRankFromApi(term: string, country: string, rawAppId: string): Promise<number | null> {
-        // Map UK to GB for iTunes API
-        const itunesCountry = country.toUpperCase() === 'UK' ? 'GB' : country;
+        // Map non-standard country codes to ISO 3166-1 alpha-2
+        const countryMap: Record<string, string> = {
+            'UK': 'GB',
+            'SW': 'SE', // Common mistake: Sweden is SE, not SW
+            'EN': 'US', // Default EN to US
+        };
+
+        const upperCountry = country.toUpperCase();
+        const itunesCountry = countryMap[upperCountry] || upperCountry;
 
         // Sanitize App ID: It might be "AppName AppID" or just "AppID"
         // We take the last part after splitting by space to get the ID/BundleID
@@ -64,13 +86,7 @@ class RequestQueue {
         console.log(`[iTunes] Fetching: ${url}`);
         console.log(`[iTunes] Raw App ID: '${rawAppId}' -> Target App ID: '${targetAppId}'`);
 
-        const response = await fetch(url);
-        if (!response.ok) {
-            console.error(`[iTunes] API Error: ${response.status} ${response.statusText}`);
-            throw new Error(`iTunes API error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await fetchThroughProxy(url);
 
         console.log(`[iTunes] Search for "${term}" in ${country} returned ${data.resultCount} results.`);
 
@@ -135,19 +151,21 @@ export interface Top5App {
 }
 
 export const fetchTop5Apps = async (term: string, country: string): Promise<Top5App[]> => {
-    // Map UK to GB for iTunes API
-    const itunesCountry = country.toUpperCase() === 'UK' ? 'GB' : country;
+    // Map non-standard country codes to ISO 3166-1 alpha-2
+    const countryMap: Record<string, string> = {
+        'UK': 'GB',
+        'SW': 'SE', // Common mistake: Sweden is SE, not SW
+        'EN': 'US', // Default EN to US
+    };
+
+    const upperCountry = country.toUpperCase();
+    const itunesCountry = countryMap[upperCountry] || upperCountry;
 
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=${itunesCountry}&entity=software&limit=200`;
 
     console.log(`[iTunes Top5] Fetching top 5 for "${term}" in ${country}`);
 
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`iTunes API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
+    const data = await fetchThroughProxy(url);
 
     if (data.resultCount === 0) return [];
 

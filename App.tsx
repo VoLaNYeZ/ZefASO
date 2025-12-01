@@ -458,7 +458,7 @@ const App = () => {
 
     const getStoreUrl = (geo: string, id: string) => {
         // Map custom codes to Apple Store ISO codes
-        const isoMap: Record<string, string> = { 'UK': 'gb', 'EN': 'gb' };
+        const isoMap: Record<string, string> = { 'UK': 'gb', 'EN': 'gb', 'SW': 'se', 'PO': 'pl' };
         const code = (isoMap[geo] || geo).toLowerCase();
         return `https://apps.apple.com/${code}/app/id${id}`;
     };
@@ -548,6 +548,8 @@ const App = () => {
         const isoMap: Record<string, string> = {
             'UK': 'GB',
             'EN': 'GB',
+            'SW': 'SE', // Sweden
+            'PO': 'PL', // Poland
         };
         const target = isoMap[code] || code;
 
@@ -588,7 +590,7 @@ const App = () => {
                     .from('google_sheets_sync')
                     .select('*')
                     .eq('user_id', session.user.id)
-                    .single();
+                    .maybeSingle();
 
                 if (error || !syncSettings || !syncSettings.is_sync_enabled) return;
 

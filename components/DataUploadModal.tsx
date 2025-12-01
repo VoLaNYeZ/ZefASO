@@ -38,6 +38,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
     const [isSyncEnabled, setIsSyncEnabled] = useState(false);
     const [isFetchingTabs, setIsFetchingTabs] = useState(false);
     const [isImportingSheet, setIsImportingSheet] = useState(false);
+    const [hasSavedSync, setHasSavedSync] = useState(false);
 
     // Manual Form State
     const [manualFormData, setManualFormData] = useState({
@@ -56,6 +57,59 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
             setTargetExistingApp(selectedApp);
         }
     }, [isOpen, selectedApp]);
+
+    useEffect(() => {
+        if (isOpen && strategy === 'sheets') {
+            checkSyncStatus();
+        }
+    }, [isOpen, strategy]);
+
+    const checkSyncStatus = async () => {
+        console.log("Checking sync status...");
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+            .from('google_sheets_sync')
+            .select('*')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        console.log("Sync status result:", data, error);
+
+        if (data) {
+            setWebAppUrl(data.web_app_url);
+            // We don't have all tabs stored, only selected ones. 
+            // To allow editing, we might need to fetch all tabs again if the user wants to change them.
+            // For now, let's just show the selected ones and allow disconnect.
+            setSheetTabs(data.selected_tabs || []);
+            setSelectedTabs(new Set(data.selected_tabs || []));
+            setIsSyncEnabled(data.is_sync_enabled);
+            setHasSavedSync(true);
+        }
+    };
+
+    const handleDisconnect = async () => {
+        if (!confirm("Are you sure you want to disconnect the Google Sheet sync?")) return;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { error } = await supabase
+            .from('google_sheets_sync')
+            .delete()
+            .eq('user_id', user.id);
+
+        if (!error) {
+            setHasSavedSync(false);
+            setWebAppUrl('');
+            setSheetTabs([]);
+            setSelectedTabs(new Set());
+            setIsSyncEnabled(false);
+        } else {
+            alert("Failed to disconnect.");
+        }
+    };
 
     if (!isOpen) return null;
 
@@ -427,7 +481,12 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                 selected_tabs: Array.from(selectedTabs),
                                 last_synced_at: new Date().toISOString()
                             });
-                        if (error) console.error("Failed to save sync settings:", error);
+                        if (error) {
+                            console.error("Failed to save sync settings:", error);
+                            alert("Data imported, but failed to save sync settings: " + error.message);
+                        } else {
+                            console.log("Sync settings saved successfully.");
+                        }
                     }
                 }
             } else {
@@ -597,68 +656,120 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
 
                             {strategy === 'sheets' && (
                                 <div className="mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
-                                    <div>
-                                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase block mb-1">Google Apps Script Web App URL</label>
-                                        <input
-                                            value={webAppUrl}
-                                            onChange={(e) => setWebAppUrl(e.target.value)}
-                                            placeholder="https://script.google.com/macros/s/.../exec"
-                                            className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                                        />
-                                        <p className="text-xs text-slate-400 mt-1">Get this by deploying the Apps Script in your Google Sheet.</p>
-                                    </div>
+                                    {hasSavedSync ? (
+                                        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
+                                            <div className="flex items-center space-x-2 mb-3">
+                                                <CheckCircle className="text-emerald-600 dark:text-emerald-400" size={20} />
+                                                <h3 className="font-bold text-emerald-800 dark:text-emerald-300">Sync Active</h3>
+                                            </div>
 
-                                    {!sheetTabs.length ? (
-                                        <button
-                                            onClick={handleFetchTabs}
-                                            disabled={isFetchingTabs || !webAppUrl}
-                                            className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                                        >
-                                            {isFetchingTabs ? 'Fetching Tabs...' : 'Fetch Tabs'}
-                                        </button>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase block mb-1">Connected Web App URL</label>
+                                                    <div className="text-sm font-mono bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700 truncate text-slate-700 dark:text-slate-300">
+                                                        {webAppUrl}
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase block mb-1">Synced Tabs</label>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {Array.from(selectedTabs).map(tab => (
+                                                            <span key={tab} className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs text-slate-700 dark:text-slate-300">
+                                                                {tab}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <div className="pt-3 flex gap-3">
+                                                    <button
+                                                        onClick={() => setHasSavedSync(false)}
+                                                        className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-2 rounded-lg font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-sm"
+                                                    >
+                                                        Edit Settings
+                                                    </button>
+                                                    <button
+                                                        onClick={handleSheetImport}
+                                                        className="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors text-sm"
+                                                    >
+                                                        Run Sync
+                                                    </button>
+                                                    <button
+                                                        onClick={handleDisconnect}
+                                                        className="px-4 py-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm"
+                                                    >
+                                                        Disconnect
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     ) : (
-                                        <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
-                                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block mb-2">Select Tabs (Apps)</label>
-                                            <div className="max-h-40 overflow-y-auto space-y-2 mb-4">
-                                                {sheetTabs.map(tab => (
-                                                    <label key={tab} className="flex items-center space-x-2 cursor-pointer">
+                                        <>
+                                            <div>
+                                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase block mb-1">Google Apps Script Web App URL</label>
+                                                <input
+                                                    value={webAppUrl}
+                                                    onChange={(e) => setWebAppUrl(e.target.value)}
+                                                    placeholder="https://script.google.com/macros/s/.../exec"
+                                                    className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                                                />
+                                                <p className="text-xs text-slate-400 mt-1">Get this by deploying the Apps Script in your Google Sheet.</p>
+                                            </div>
+
+                                            {!sheetTabs.length ? (
+                                                <button
+                                                    onClick={handleFetchTabs}
+                                                    disabled={isFetchingTabs || !webAppUrl}
+                                                    className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                                                >
+                                                    {isFetchingTabs ? 'Fetching Tabs...' : 'Fetch Tabs'}
+                                                </button>
+                                            ) : (
+                                                <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                                                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block mb-2">Select Tabs (Apps)</label>
+                                                    <div className="max-h-40 overflow-y-auto space-y-2 mb-4">
+                                                        {sheetTabs.map(tab => (
+                                                            <label key={tab} className="flex items-center space-x-2 cursor-pointer">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedTabs.has(tab)}
+                                                                    onChange={(e) => {
+                                                                        const newSet = new Set(selectedTabs);
+                                                                        if (e.target.checked) newSet.add(tab);
+                                                                        else newSet.delete(tab);
+                                                                        setSelectedTabs(newSet);
+                                                                    }}
+                                                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                                />
+                                                                <span className="text-sm text-slate-700 dark:text-slate-300">{tab}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+
+                                                    <div className="flex items-center space-x-2 mb-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                                                         <input
                                                             type="checkbox"
-                                                            checked={selectedTabs.has(tab)}
-                                                            onChange={(e) => {
-                                                                const newSet = new Set(selectedTabs);
-                                                                if (e.target.checked) newSet.add(tab);
-                                                                else newSet.delete(tab);
-                                                                setSelectedTabs(newSet);
-                                                            }}
+                                                            id="autoSync"
+                                                            checked={isSyncEnabled}
+                                                            onChange={(e) => setIsSyncEnabled(e.target.checked)}
                                                             className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                                         />
-                                                        <span className="text-sm text-slate-700 dark:text-slate-300">{tab}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
+                                                        <label htmlFor="autoSync" className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                                                            Automatic daily sync (on session start)
+                                                        </label>
+                                                    </div>
 
-                                            <div className="flex items-center space-x-2 mb-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                                <input
-                                                    type="checkbox"
-                                                    id="autoSync"
-                                                    checked={isSyncEnabled}
-                                                    onChange={(e) => setIsSyncEnabled(e.target.checked)}
-                                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                                />
-                                                <label htmlFor="autoSync" className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                                                    Automatic daily sync (on session start)
-                                                </label>
-                                            </div>
-
-                                            <button
-                                                onClick={handleSheetImport}
-                                                disabled={isImportingSheet || selectedTabs.size === 0}
-                                                className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                                            >
-                                                {isImportingSheet ? 'Importing...' : 'Import Selected Tabs'}
-                                            </button>
-                                        </div>
+                                                    <button
+                                                        onClick={handleSheetImport}
+                                                        disabled={isImportingSheet || selectedTabs.size === 0}
+                                                        className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                                                    >
+                                                        {isImportingSheet ? 'Importing...' : 'Import Selected Tabs'}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -734,7 +845,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                     </div>
                                 )}
 
-                                {inputMethod === 'manual' && strategy !== 'bulk' && (
+                                {inputMethod === 'manual' && strategy !== 'bulk' && strategy !== 'sheets' && (
                                     <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <label className="text-xs font-semibold text-slate-500 uppercase">Date</label>
