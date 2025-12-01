@@ -155,7 +155,7 @@ export const translations = {
         geos: 'Geos',
 
         // Real-Time Standings
-        realTimeStandings: 'Real-Time Standings',
+        realTimeStandings: 'Real-Time Standings (iTunes)',
         refreshAll: 'Refresh All',
 
         // Top 5 Feature
@@ -321,7 +321,7 @@ export const translations = {
         geos: 'гео',
 
         // Real-Time Standings
-        realTimeStandings: 'Позиции в реальном времени',
+        realTimeStandings: 'Позиции в реальном времени (iTunes)',
         refreshAll: 'Обновить все',
 
         // Top 5 Feature
