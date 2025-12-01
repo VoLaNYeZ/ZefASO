@@ -181,7 +181,7 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
                                                 <Clock size={10} />
                                                 <span>
                                                     {data?.lastUpdated
-                                                        ? new Date(data.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                        ? `${new Date(data.lastUpdated).toLocaleDateString('en-GB')} ${new Date(data.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                                                         : 'Never'}
                                                 </span>
                                             </div>

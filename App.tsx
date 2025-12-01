@@ -1470,9 +1470,9 @@ const App = () => {
                                         <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
                                             <TrendingUp size={24} />
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Installs</p>
-                                            <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{summary.installs.toLocaleString()}</h3>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 truncate">Total Installs</p>
+                                            <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100 truncate" title={summary.installs.toLocaleString()}>{summary.installs.toLocaleString()}</h3>
                                         </div>
                                     </div>
                                 </div>
@@ -1543,9 +1543,9 @@ const App = () => {
                                         <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-xl">
                                             <DollarSign size={24} />
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Cost</p>
-                                            <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100">${summary.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 truncate">Total Cost</p>
+                                            <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100 truncate" title={`$${summary.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}>${summary.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
                                         </div>
                                     </div>
                                 </div>

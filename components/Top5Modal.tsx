@@ -128,7 +128,7 @@ const Top5Modal: React.FC<Top5ModalProps> = ({
                                                 href={app.trackViewUrl}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="font-bold text-slate-800 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 truncate text-lg transition-colors cursor-pointer"
+                                                className="block font-bold text-slate-800 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 truncate text-lg transition-colors cursor-pointer"
                                             >
                                                 {app.trackName}
                                             </a>
