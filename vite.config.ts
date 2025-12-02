@@ -32,27 +32,10 @@ export default defineConfig(({ mode }) => {
           pure_funcs: ['console.log'], // Optional: remove console.log calls
         }
       },
+      // Use Vite's default chunk splitting to avoid circular dependencies between manual vendor bundles
       rollupOptions: {
         output: {
-          // Remove banner comments (license headers)
-          banner: '',
-          // Better chunk splitting strategy
-          manualChunks(id) {
-            // Split large vendor libraries into separate chunks
-            if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('react-dom')) {
-                return 'react-vendor';
-              }
-              if (id.includes('@supabase')) {
-                return 'supabase';
-              }
-              if (id.includes('i18next')) {
-                return 'i18n';
-              }
-              // Group all other node_modules into a common vendor chunk
-              return 'vendor';
-            }
-          }
+          banner: ''
         }
       }
     }
