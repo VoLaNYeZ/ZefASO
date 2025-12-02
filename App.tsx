@@ -59,13 +59,61 @@ import { analyzeASOTrends } from './services/geminiService';
 import { OverviewDashboard } from './components/OverviewDashboard';
 import { RealtimeStandings } from './components/RealtimeStandings';
 import { ComparisonDashboard } from './components/ComparisonDashboard';
-import { supabase } from './lib/supabase';
+import { supabase, supabaseConfigError, supabaseEnvStatus } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
 import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences } from './lib/supabaseService';
 import { fetchSheetData, processSheetData } from './services/googleSheets';
 
 const App = () => {
+    if (supabaseConfigError) {
+        return (
+            <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-6">
+                <div className="max-w-2xl w-full bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-8 space-y-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-300">
+                            ⚠️
+                        </div>
+                        <div>
+                            <p className="text-sm text-red-400 font-semibold tracking-wide">Supabase configuration required</p>
+                            <h1 className="text-2xl font-black">Environment variables are missing</h1>
+                        </div>
+                    </div>
+
+                    <p className="text-slate-300 leading-relaxed">
+                        The dashboard needs <code className="bg-slate-800 px-1.5 py-0.5 rounded text-indigo-200">VITE_SUPABASE_URL</code> and
+                        <code className="bg-slate-800 px-1.5 py-0.5 rounded text-indigo-200 ml-1">VITE_SUPABASE_ANON_KEY</code> set in your Vercel Environment
+                        Variables. Without them the app cannot talk to Supabase, which results in a blank screen.
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-slate-800/60 rounded-xl border border-slate-700">
+                            <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold">VITE_SUPABASE_URL</p>
+                            <p className={`mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-lg text-sm font-semibold ${supabaseEnvStatus.hasUrl ? 'bg-emerald-500/10 text-emerald-200 border border-emerald-700/50' : 'bg-red-500/10 text-red-200 border border-red-700/50'}`}>
+                                {supabaseEnvStatus.hasUrl ? 'Present' : 'Missing'}
+                            </p>
+                        </div>
+                        <div className="p-4 bg-slate-800/60 rounded-xl border border-slate-700">
+                            <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold">VITE_SUPABASE_ANON_KEY</p>
+                            <p className={`mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-lg text-sm font-semibold ${supabaseEnvStatus.hasAnonKey ? 'bg-emerald-500/10 text-emerald-200 border border-emerald-700/50' : 'bg-red-500/10 text-red-200 border border-red-700/50'}`}>
+                                {supabaseEnvStatus.hasAnonKey ? 'Present' : 'Missing'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2 text-sm text-slate-300">
+                        <p>Quick fix checklist:</p>
+                        <ul className="list-disc list-inside space-y-1 text-slate-400">
+                            <li>Open <strong>Vercel &gt; Project &gt; Settings &gt; Environment Variables</strong>.</li>
+                            <li>Make sure the variable names include the <code className="bg-slate-800 px-1 rounded text-indigo-200">VITE_</code> prefix.</li>
+                            <li>Add the values from your Supabase project (Project Settings → API) and redeploy.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     // -- Auth State --
     const [session, setSession] = useState<Session | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
