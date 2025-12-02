@@ -284,7 +284,10 @@ export const ComposedAppChart: React.FC<ComposedAppChartProps> = ({
                                 axisLine={false}
                                 tickLine={false}
                                 minTickGap={30}
-                                tickFormatter={(val) => val.slice(5)} // MM-DD
+                                tickFormatter={(val) => {
+                                    const [y, m, d] = val.split('-');
+                                    return `${d}/${m}`;
+                                }}
                             />
                             <YAxis
                                 yAxisId="left"
@@ -321,7 +324,7 @@ export const ComposedAppChart: React.FC<ComposedAppChartProps> = ({
                                                 ? 'border-amber-200 text-amber-700 dark:border-amber-700/50 dark:text-amber-400'
                                                 : 'border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400'
                                                 }`}>
-                                                {new Date(label).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                                                {new Date(label).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}
                                                 {hasRank1 && <span className="ml-2 text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-bold">★ #1 Rank</span>}
                                             </div>
                                             <div className="p-3 space-y-1">

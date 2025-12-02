@@ -635,7 +635,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                         value={targetNewApp}
                                         onChange={(e) => setTargetNewApp(e.target.value)}
                                         placeholder="e.g. My Awesome App"
-                                        className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-medium bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                                        className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-medium bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
                                         autoFocus
                                     />
                                     <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">
@@ -712,7 +712,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                                     value={webAppUrl}
                                                     onChange={(e) => setWebAppUrl(e.target.value)}
                                                     placeholder="https://script.google.com/macros/s/.../exec"
-                                                    className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                                                    className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
                                                 />
                                                 <p className="text-xs text-slate-400 mt-1">Get this by deploying the Apps Script in your Google Sheet.</p>
                                             </div>
@@ -808,7 +808,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                 {inputMethod === 'paste' && (
                                     <div>
                                         <textarea
-                                            className="w-full h-40 p-3 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                                            className="w-full h-40 p-3 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
                                             placeholder={`23/11/2025\tApp Name\tUS\t174959\tKeyword\t98\t2\t99`}
                                             value={bulkText}
                                             onChange={e => setBulkText(e.target.value)}
@@ -852,7 +852,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                             <input
                                                 type="date"
                                                 required
-                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900 dark:placeholder-slate-500"
                                                 value={manualFormData.date}
                                                 onChange={e => setManualFormData({ ...manualFormData, date: e.target.value })}
                                             />
@@ -861,30 +861,27 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                             <label className="text-xs font-semibold text-slate-500 uppercase">GEO</label>
                                             <input
                                                 required
-                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                value={manualFormData.geo}
                                                 onChange={e => setManualFormData({ ...manualFormData, geo: e.target.value })}
                                                 placeholder="US"
+                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900 dark:placeholder-slate-500"
                                             />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-xs font-semibold text-slate-500 uppercase">App ID</label>
                                             <input
                                                 required
-                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                value={manualFormData.appId}
                                                 onChange={e => setManualFormData({ ...manualFormData, appId: e.target.value })}
                                                 placeholder="123456"
+                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900 dark:placeholder-slate-500"
                                             />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-xs font-semibold text-slate-500 uppercase">Keyword</label>
                                             <input
                                                 required
-                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                value={manualFormData.keyword}
                                                 onChange={e => setManualFormData({ ...manualFormData, keyword: e.target.value })}
-                                                placeholder="Keyword"
+                                                placeholder="Keyword..."
+                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900 dark:placeholder-slate-500 placeholder:font-['cursive']"
                                             />
                                         </div>
                                         <div className="space-y-1">
@@ -892,7 +889,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                             <input
                                                 type="number"
                                                 required
-                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900 dark:placeholder-slate-500"
                                                 value={manualFormData.ranking}
                                                 onChange={e => setManualFormData({ ...manualFormData, ranking: e.target.value })}
                                             />
@@ -902,7 +899,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                             <input
                                                 type="number"
                                                 required
-                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900 dark:placeholder-slate-500"
                                                 value={manualFormData.installs}
                                                 onChange={e => setManualFormData({ ...manualFormData, installs: e.target.value })}
                                             />

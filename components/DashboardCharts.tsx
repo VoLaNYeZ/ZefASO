@@ -124,8 +124,10 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
   }, [data, granularity]);
 
   const xAxisFormatter = (val: string) => {
-    if (granularity === 'Daily') return val.slice(5);
-    if (granularity === 'Weekly') return val.slice(5);
+    if (granularity === 'Daily' || granularity === 'Weekly') {
+      const [y, m, d] = val.split('-');
+      return `${d}/${m}`;
+    }
     if (granularity === 'Monthly') {
       const [y, m] = val.split('-');
       const date = new Date(parseInt(y), parseInt(m) - 1);
