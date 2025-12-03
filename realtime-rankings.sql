@@ -6,6 +6,8 @@ create table if not exists realtime_rankings (
   keyword text not null,
   geo text not null,
   rank integer, -- null means not found
+  traffic numeric, -- null means not fetched
+  traffic_data jsonb, -- full response from API
   last_updated timestamptz default now() not null,
   
   -- Unique constraint to ensure one entry per user/app/keyword/geo

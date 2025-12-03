@@ -8,6 +8,13 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       host: '0.0.0.0',
+      proxy: {
+        '/asomobile-api': {
+          target: 'https://app.asomobile.net',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/asomobile-api/, '/asomobile-public-api'),
+        },
+      },
     },
     plugins: [react()],
     define: {

@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Clock, AlertCircle, CheckCircle2, Trophy, Eye } from 'lucide-react';
+import { RefreshCw, Clock, AlertCircle, CheckCircle2, Trophy, Eye, Activity } from 'lucide-react';
 import { fetchAppRank, fetchTop5Apps, Top5App } from '../lib/itunesService';
-import { loadRealtimeRankings, saveRealtimeRanking, RealtimeRanking } from '../lib/supabaseService';
+import { loadRealtimeRankings, saveRealtimeRanking, RealtimeRanking, getApiUsage, incrementApiUsage } from '../lib/supabaseService';
+import { fetchTrafficData, TrafficData } from '../services/asoMobile';
+import { TrafficTooltip } from './TrafficTooltip';
+import { ConfirmationPopover } from './ConfirmationPopover';
 import Top5Modal from './Top5Modal';
 
 interface RealtimeStandingsProps {
@@ -25,7 +28,19 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
 }) => {
     const [rankings, setRankings] = useState<Record<string, RealtimeRanking>>({});
     const [loadingState, setLoadingState] = useState<Record<string, boolean>>({});
+    const [trafficLoadingState, setTrafficLoadingState] = useState<Record<string, boolean>>({});
+    const [hoveredTraffic, setHoveredTraffic] = useState<string | null>(null);
+    const [hoveredTrafficElement, setHoveredTrafficElement] = useState<HTMLElement | null>(null);
     const [isGlobalLoading, setIsGlobalLoading] = useState(false);
+    const [apiUsageCount, setApiUsageCount] = useState<number>(0);
+
+    // Popover State
+    const [popoverState, setPopoverState] = useState<{
+        isOpen: boolean;
+        keyword: string;
+        geo: string;
+        targetRef: React.RefObject<HTMLElement> | null;
+    }>({ isOpen: false, keyword: '', geo: '', targetRef: null });
 
     // Top 5 Modal State
     const [isTop5ModalOpen, setIsTop5ModalOpen] = useState(false);
@@ -37,7 +52,13 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
     // Load saved rankings on mount
     useEffect(() => {
         loadData();
+        loadApiUsage();
     }, [appId]);
+
+    const loadApiUsage = async () => {
+        const count = await getApiUsage('aso_mobile');
+        setApiUsageCount(count);
+    };
 
     const loadData = async () => {
         const data = await loadRealtimeRankings(appId);
@@ -76,6 +97,51 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
         } finally {
             setLoadingState(prev => ({ ...prev, [key]: false }));
         }
+    };
+
+    const handleTrafficFetchConfirm = async () => {
+        const { keyword, geo } = popoverState;
+        if (!keyword || !geo) return;
+
+        const key = getKey(keyword, geo);
+        setTrafficLoadingState(prev => ({ ...prev, [key]: true }));
+
+        try {
+            const trafficData = await fetchTrafficData(keyword, geo);
+
+            // Increment usage
+            const newCount = await incrementApiUsage('aso_mobile');
+            setApiUsageCount(newCount);
+
+            // Update Supabase
+            const currentRanking = rankings[key];
+            if (currentRanking) {
+                const updatedRanking: RealtimeRanking = {
+                    ...currentRanking,
+                    traffic: trafficData.traffic?.value,
+                    trafficData: trafficData
+                };
+
+                await saveRealtimeRanking(updatedRanking);
+                setRankings(prev => ({ ...prev, [key]: updatedRanking }));
+            }
+        } catch (error: any) {
+            console.error(`Failed to fetch traffic for ${keyword} in ${geo}`, error);
+            alert(`Failed to fetch traffic data: ${error.message || 'Unknown error'}`);
+        } finally {
+            setTrafficLoadingState(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
+    const handleTrafficClick = (keyword: string, geo: string, event: React.MouseEvent<HTMLElement>) => {
+        // Create a ref-like object for the clicked element
+        const target = { current: event.currentTarget as HTMLElement };
+        setPopoverState({
+            isOpen: true,
+            keyword,
+            geo,
+            targetRef: target
+        });
     };
 
     const handleRefreshAll = async () => {
@@ -188,6 +254,57 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
                                         </div>
 
                                         <div className="flex items-center gap-3">
+                                            {/* Traffic Refresh Button - only show when data exists */}
+                                            {typeof data?.traffic === 'number' && !trafficLoadingState[key] && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleTrafficClick(keyword, geo, e);
+                                                    }}
+                                                    className="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-md transition-colors"
+                                                    title="Refresh traffic data"
+                                                >
+                                                    <RefreshCw size={12} />
+                                                </button>
+                                            )}
+
+                                            {/* Traffic Display */}
+                                            <div
+                                                className="relative flex items-center justify-center w-16 h-8 rounded-lg font-bold text-sm bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                                                onMouseEnter={(e) => {
+                                                    setHoveredTraffic(key);
+                                                    setHoveredTrafficElement(e.currentTarget);
+                                                }}
+                                                onMouseLeave={() => {
+                                                    setHoveredTraffic(null);
+                                                    setHoveredTrafficElement(null);
+                                                }}
+                                            >
+                                                {trafficLoadingState[key] ? (
+                                                    <RefreshCw size={14} className="animate-spin text-indigo-500" />
+                                                ) : typeof data?.traffic === 'number' ? (
+                                                    <span className="cursor-help">{Math.round(data.traffic)}</span>
+                                                ) : (
+                                                    <button
+                                                        onClick={(e) => handleTrafficClick(keyword, geo, e)}
+                                                        className="w-full h-full flex items-center justify-center hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-500 transition-colors rounded-lg"
+                                                        title="Fetch Traffic"
+                                                    >
+                                                        <Activity size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {/* Render tooltip outside the relative container */}
+                                            {hoveredTraffic === key && typeof data?.traffic === 'number' && (
+                                                <TrafficTooltip
+                                                    data={data.trafficData}
+                                                    lastUpdated={data.lastUpdated}
+                                                    isVisible={true}
+                                                    targetElement={hoveredTrafficElement}
+                                                />
+                                            )}
+
                                             {/* Rank Display */}
                                             <div className={`flex items-center justify-center w-12 h-8 rounded-lg font-bold text-sm ${isLoading ? 'bg-slate-100 dark:bg-slate-800 text-slate-400' :
                                                 !data ? 'bg-slate-100 dark:bg-slate-800 text-slate-400' :
@@ -232,7 +349,7 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
             </div>
 
             {/* Top 5 Modal */}
-            <Top5Modal
+            < Top5Modal
                 isOpen={isTop5ModalOpen}
                 onClose={() => setIsTop5ModalOpen(false)}
                 apps={top5Apps}
@@ -242,6 +359,17 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
                 error={top5Error}
                 getCountryFlag={getCountryFlag}
                 translations={translations}
+            />
+
+            {/* Confirmation Popover */}
+            <ConfirmationPopover
+                isOpen={popoverState.isOpen}
+                onClose={() => setPopoverState(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={handleTrafficFetchConfirm}
+                message="Fetch traffic data?"
+                subMessage={`Requests left: ${Math.max(0, 50 - apiUsageCount)}`}
+                confirmText="Fetch"
+                targetRef={popoverState.targetRef as React.RefObject<HTMLElement>}
             />
         </div>
     );

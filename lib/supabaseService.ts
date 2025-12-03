@@ -138,6 +138,7 @@ interface UserPreferences {
     lang: 'en' | 'ru';
     theme: 'light' | 'dark';
     hiddenApps: string[];
+    apiUsage?: Record<string, any>;
 }
 
 export const loadUserPreferences = async (): Promise<UserPreferences> => {
@@ -159,8 +160,50 @@ export const loadUserPreferences = async (): Promise<UserPreferences> => {
     return {
         lang: data.lang as 'en' | 'ru',
         theme: data.theme as 'light' | 'dark',
-        hiddenApps: data.hidden_apps || []
+        hiddenApps: data.hidden_apps || [],
+        apiUsage: data.api_usage || {}
     };
+};
+
+export const getApiUsage = async (service: string): Promise<number> => {
+    const prefs = await loadUserPreferences();
+    return prefs.apiUsage?.[service]?.count || 0;
+};
+
+export const incrementApiUsage = async (service: string): Promise<number> => {
+    const userId = await getUserId();
+    const prefs = await loadUserPreferences();
+
+    const currentUsage = prefs.apiUsage?.[service] || { count: 0, month: new Date().toISOString().slice(0, 7) };
+
+    // Check if month changed, reset if needed (optional, but good practice)
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    if (currentUsage.month !== currentMonth) {
+        currentUsage.count = 0;
+        currentUsage.month = currentMonth;
+    }
+
+    currentUsage.count += 1;
+
+    const newApiUsage = {
+        ...(prefs.apiUsage || {}),
+        [service]: currentUsage
+    };
+
+    const { error } = await supabase
+        .from('user_preferences')
+        .update({
+            api_usage: newApiUsage,
+            updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
+
+    if (error) {
+        console.error('Error incrementing API usage:', error);
+        throw error;
+    }
+
+    return currentUsage.count;
 };
 
 export const saveUserPreferences = async (prefs: UserPreferences): Promise<void> => {
@@ -191,6 +234,8 @@ export interface RealtimeRanking {
     keyword: string;
     geo: string;
     rank: number | null;
+    traffic?: number | null;
+    trafficData?: any;
     lastUpdated: string;
 }
 
@@ -213,6 +258,8 @@ export const loadRealtimeRankings = async (appId: string): Promise<RealtimeRanki
         keyword: row.keyword,
         geo: row.geo,
         rank: row.rank,
+        traffic: row.traffic,
+        trafficData: row.traffic_data,
         lastUpdated: row.last_updated
     }));
 };
@@ -228,6 +275,8 @@ export const saveRealtimeRanking = async (ranking: RealtimeRanking): Promise<voi
             keyword: ranking.keyword,
             geo: ranking.geo,
             rank: ranking.rank,
+            traffic: ranking.traffic,
+            traffic_data: ranking.trafficData,
             last_updated: new Date().toISOString()
         }, {
             onConflict: 'user_id,app_id,keyword,geo'

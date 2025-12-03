@@ -1,7 +1,3 @@
--- ============================================
--- ZeyfASO Supabase Schema
--- Run this in your Supabase SQL Editor
--- ============================================
 
 -- 1. ASO Entries Table
 CREATE TABLE aso_entries (
@@ -35,6 +31,7 @@ CREATE TABLE user_preferences (
   lang TEXT DEFAULT 'en',
   theme TEXT DEFAULT 'light',
   hidden_apps TEXT[] DEFAULT '{}',
+  api_usage JSONB DEFAULT '{}',
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 

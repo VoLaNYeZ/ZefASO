@@ -934,7 +934,7 @@ const App = () => {
                 <div className="p-6 border-b border-slate-800 flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-2 text-white font-bold text-xl tracking-tight cursor-pointer" onClick={() => setCurrentPage('dashboard')}>
                         <LayoutDashboard className="text-indigo-500" />
-                        <span>ZeyfASO</span>
+                        <span>ZefASO</span>
                     </div>
                     <button onClick={() => setIsSidebarOpen(false)} className="md:hidden">
                         <Menu size={20} />
