@@ -161,7 +161,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
       {/* Graph 1: Installs */}
       <div className={chartContainerClass}>
         <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">{granularity} Installs</h3>
-        <div className={`${chartHeightClass} w-full`}>
+        <div className={`${chartHeightClass} w-full min-w-0`}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData}>
               <defs>
@@ -208,7 +208,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
       {/* Graph 2: Ranking */}
       <div className={chartContainerClass}>
         <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">{translations?.avgAppStoreRanking || 'Avg. App Store Ranking'}</h3>
-        <div className={`${chartHeightClass} w-full`}>
+        <div className={`${chartHeightClass} w-full min-w-0`}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
@@ -309,7 +309,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
           )}
         </div>
 
-        <div className={`${chartHeightClass} w-full`}>
+        <div className={`${chartHeightClass} w-full min-w-0`}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />

@@ -427,24 +427,20 @@ const App = () => {
                     // iTunes Lookup API
                     const targetUrl = `https://itunes.apple.com/lookup?id=${currentNumericId}&country=${country}`;
                     // Use allorigins.win as a more reliable CORS proxy
-                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+                    // Use Supabase Edge Function to proxy the request
+                    const { data: itunesData, error } = await supabase.functions.invoke('itunes-proxy', {
+                        body: { url: targetUrl }
+                    });
 
-                    const response = await fetch(proxyUrl);
-                    if (response.ok) {
-                        const data = await response.json();
-                        // allorigins returns the actual content in 'contents' field
-                        const itunesData = JSON.parse(data.contents);
+                    if (!error && itunesData && itunesData.resultCount > 0) {
+                        const result = itunesData.results[0];
+                        const iconUrl = result.artworkUrl512 || result.artworkUrl100 || result.artworkUrl60;
 
-                        if (itunesData.resultCount > 0) {
-                            const result = itunesData.results[0];
-                            const iconUrl = result.artworkUrl512 || result.artworkUrl100 || result.artworkUrl60;
-
-                            // Only update if the icon is different to avoid loops/unnecessary saves
-                            if (iconUrl && iconUrl !== appIcons[filters.appName]) {
-                                setAppIcons(prev => ({ ...prev, [filters.appName!]: iconUrl }));
-                            }
-                            return; // Stop once found
+                        // Only update if the icon is different to avoid loops/unnecessary saves
+                        if (iconUrl && iconUrl !== appIcons[filters.appName]) {
+                            setAppIcons(prev => ({ ...prev, [filters.appName!]: iconUrl }));
                         }
+                        return; // Stop once found
                     }
                 } catch (e) {
                     console.warn(`Icon fetch failed for ${country}`, e);

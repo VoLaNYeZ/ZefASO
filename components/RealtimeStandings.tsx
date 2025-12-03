@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw, Clock, AlertCircle, CheckCircle2, Trophy, Eye, Activity } from 'lucide-react';
 import { fetchAppRank, fetchTop5Apps, Top5App } from '../lib/itunesService';
-import { loadRealtimeRankings, saveRealtimeRanking, RealtimeRanking, getApiUsage, incrementApiUsage } from '../lib/supabaseService';
+import { loadRealtimeRankings, saveRealtimeRanking, RealtimeRanking, getApiUsage, incrementApiUsage, fetchCountryRankings, CountryRanking } from '../lib/supabaseService';
 import { fetchTrafficData, TrafficData } from '../services/asoMobile';
 import { TrafficTooltip } from './TrafficTooltip';
 import { ConfirmationPopover } from './ConfirmationPopover';
@@ -33,6 +33,8 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
     const [hoveredTrafficElement, setHoveredTrafficElement] = useState<HTMLElement | null>(null);
     const [isGlobalLoading, setIsGlobalLoading] = useState(false);
     const [apiUsageCount, setApiUsageCount] = useState<number>(0);
+    const [countryRankings, setCountryRankings] = useState<Record<string, CountryRanking>>({});
+    const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
 
     // Popover State
     const [popoverState, setPopoverState] = useState<{
@@ -53,7 +55,24 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
     useEffect(() => {
         loadData();
         loadApiUsage();
+        loadCountryRankings();
     }, [appId]);
+
+    // Map common country code variations to standard ISO codes
+    const normalizeCountryCode = (geo: string): string => {
+        const mapping: Record<string, string> = {
+            'UK': 'GB',  // United Kingdom
+            'SW': 'SE',  // Sweden
+            'NE': 'NL',  // Netherlands
+            'NO': 'NO',  // Norway (already standard)
+        };
+        return mapping[geo.toUpperCase()] || geo.toUpperCase();
+    };
+
+    const loadCountryRankings = async () => {
+        const rankings = await fetchCountryRankings();
+        setCountryRankings(rankings);
+    };
 
     const loadApiUsage = async () => {
         const count = await getApiUsage('aso_mobile');
@@ -228,6 +247,43 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
                         <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
                             <img src={getCountryFlag(geo)} alt={geo} className="w-5 h-4 object-cover rounded-sm" />
                             <span className="font-bold text-slate-700 dark:text-slate-200">{geo}</span>
+                            {countryRankings[normalizeCountryCode(geo)] && (
+                                <div
+                                    className="relative inline-flex items-center"
+                                    onMouseEnter={() => setHoveredCountry(geo)}
+                                    onMouseLeave={() => setHoveredCountry(null)}
+                                >
+                                    <span className={`px-1.5 py-px text-[9px] font-bold rounded shadow-sm cursor-help ${countryRankings[normalizeCountryCode(geo)].label === 1
+                                        ? 'bg-gradient-to-br from-yellow-400 to-amber-600 text-white border border-yellow-500'
+                                        : countryRankings[normalizeCountryCode(geo)].label === 2
+                                            ? 'bg-gradient-to-br from-slate-300 to-slate-500 text-slate-900 border border-slate-400'
+                                            : countryRankings[normalizeCountryCode(geo)].label === 3
+                                                ? 'bg-gradient-to-br from-orange-400 to-orange-600 text-white border border-orange-500'
+                                                : countryRankings[normalizeCountryCode(geo)].label === 4
+                                                    ? 'bg-gradient-to-br from-blue-400 to-blue-600 text-white border border-blue-500'
+                                                    : countryRankings[normalizeCountryCode(geo)].label === 5
+                                                        ? 'bg-gradient-to-br from-purple-400 to-purple-600 text-white border border-purple-500'
+                                                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-600'
+                                        }`} title="Country Tier">
+                                        T{countryRankings[normalizeCountryCode(geo)].label}
+                                    </span>
+                                    {hoveredCountry === geo && (
+                                        <div className="absolute top-full left-0 mt-2 bg-slate-900 dark:bg-slate-800 text-white px-3 py-2 rounded-lg shadow-xl z-50 min-w-[200px] border border-slate-700 dark:border-slate-600">
+                                            <div className="text-[11px] font-bold mb-1.5">{countryRankings[normalizeCountryCode(geo)].name || geo}</div>
+                                            {countryRankings[normalizeCountryCode(geo)].population && (
+                                                <div className="text-xs mb-1">
+                                                    <span className="text-slate-400">Population:</span> <span className="font-bold">{countryRankings[normalizeCountryCode(geo)].population!.toLocaleString()}</span>
+                                                </div>
+                                            )}
+                                            {countryRankings[normalizeCountryCode(geo)].gdp && (
+                                                <div className="text-xs">
+                                                    <span className="text-slate-400">GDP per capita:</span> <span className="font-bold">${countryRankings[normalizeCountryCode(geo)].gdp!.toLocaleString()}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Table */}

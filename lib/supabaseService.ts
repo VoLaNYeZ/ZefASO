@@ -286,3 +286,59 @@ export const saveRealtimeRanking = async (ranking: RealtimeRanking): Promise<voi
         console.error('Error saving realtime ranking:', error);
     }
 };
+
+// ============================================
+// Country Rankings
+// ============================================
+
+export interface CountryRanking {
+    code: string;
+    label: number;
+    name?: string;
+    population?: number;
+    gdp?: number;
+}
+
+export const fetchCountryRankings = async (): Promise<Record<string, CountryRanking>> => {
+    try {
+        const response = await supabase
+            .from('countries_ranked')
+            .select('*');
+
+        const { data, error } = response;
+
+        if (error) {
+            console.error('Error loading country rankings:', error);
+            return {};
+        }
+
+        if (!data || data.length === 0) {
+            return {};
+        }
+
+        const map: Record<string, CountryRanking> = {};
+        (data || []).forEach((row: any) => {
+            // Try different casing variations
+            const code = row.Code || row.code || row.CODE;
+            const label = row.Label || row.label || row.LABEL;
+            const name = row.GEO || row.Geo || row.geo;
+            const population = row.population_2025 || row.Population_2025;
+            const gdp = row.GDP_pc_2025 || row.gdp_pc_2025;
+
+            if (code && label) {
+                map[code.toUpperCase()] = {
+                    code: code.toUpperCase(),
+                    label,
+                    name,
+                    population,
+                    gdp
+                };
+            }
+        });
+
+        return map;
+    } catch (err) {
+        console.error('Unexpected error in fetchCountryRankings:', err);
+        return {};
+    }
+};

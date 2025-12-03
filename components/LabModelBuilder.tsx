@@ -115,7 +115,7 @@ export const LabModelBuilder: React.FC<LabModelBuilderProps> = ({ selectedRuns, 
 
             <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 min-h-0">
                 {/* Chart Section */}
-                <div className="lg:col-span-2 p-6 min-h-[300px] flex flex-col">
+                <div className="lg:col-span-2 p-6 min-h-[300px] flex flex-col min-w-0">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={modelData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                             <defs>

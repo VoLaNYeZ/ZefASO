@@ -271,7 +271,7 @@ export const ComposedAppChart: React.FC<ComposedAppChartProps> = ({
             </div>
 
             {/* Chart Body */}
-            <div className="flex-1 p-2 relative z-10 min-h-0">
+            <div className="flex-1 p-2 relative z-10 min-h-0 min-w-0">
                 {chartData.length === 0 ? (
                     <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">No data matching these filters.</div>
                 ) : (

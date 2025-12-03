@@ -77,22 +77,31 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     };
 
     // -- State --
-    // Default to this month
-    const [startDate, setStartDate] = useState<string | null>(
-        toLocalStr(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
-    );
+    // Default to last 30 days
+    const [startDate, setStartDate] = useState<string | null>(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        return toLocalStr(d);
+    });
     const [endDate, setEndDate] = useState<string | null>(
         toLocalStr(new Date())
     );
     const [selectedCategory, setSelectedCategory] = useState<string>('All');
     const [overviewMode, setOverviewMode] = useState<OverviewMode>('keyword');
 
-    const setQuickDate = (type: 'thisMonth' | 'lastMonth') => {
+    const setQuickDate = (type: 'yesterday' | 'today' | 'thisMonth' | 'lastMonth') => {
         const now = new Date();
         let start = new Date();
         let end = new Date();
 
-        if (type === 'thisMonth') {
+        if (type === 'today') {
+            start = now;
+            end = now;
+        } else if (type === 'yesterday') {
+            start = new Date(now);
+            start.setDate(now.getDate() - 1);
+            end = new Date(start);
+        } else if (type === 'thisMonth') {
             start = new Date(now.getFullYear(), now.getMonth(), 1);
             end = new Date(now.getFullYear(), now.getMonth() + 1, 0); // End of this month
         } else {
@@ -106,11 +115,19 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
     // Check active states
     const now = new Date();
+    const todayStr = toLocalStr(now);
+
+    const yestDate = new Date(now);
+    yestDate.setDate(now.getDate() - 1);
+    const yesterdayStr = toLocalStr(yestDate);
+
     const thisMonthStart = toLocalStr(new Date(now.getFullYear(), now.getMonth(), 1));
     const thisMonthEnd = toLocalStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
     const lastMonthStart = toLocalStr(new Date(now.getFullYear(), now.getMonth() - 1, 1));
     const lastMonthEnd = toLocalStr(new Date(now.getFullYear(), now.getMonth(), 0));
 
+    const isToday = startDate === todayStr && endDate === todayStr;
+    const isYesterday = startDate === yesterdayStr && endDate === yesterdayStr;
     const isThisMonth = startDate === thisMonthStart && endDate === thisMonthEnd;
     const isLastMonth = startDate === lastMonthStart && endDate === lastMonthEnd;
 
@@ -323,24 +340,44 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     <div className="h-px sm:h-auto sm:w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                        <button
-                            onClick={() => setQuickDate('lastMonth')}
-                            className={`px-3 py-2 text-xs font-bold rounded-lg transition-colors border whitespace-nowrap ${isLastMonth
-                                ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
-                                : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
-                                }`}
-                        >
-                            {t.lastMonth}
-                        </button>
-                        <button
-                            onClick={() => setQuickDate('thisMonth')}
-                            className={`px-3 py-2 text-xs font-bold rounded-lg transition-colors border whitespace-nowrap ${isThisMonth
-                                ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
-                                : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
-                                }`}
-                        >
-                            {t.thisMonth}
-                        </button>
+                        <div className="grid grid-cols-2 gap-0.5 h-[34px] w-[140px]">
+                            <button
+                                onClick={() => setQuickDate('lastMonth')}
+                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap ${isLastMonth
+                                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                    : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                    }`}
+                            >
+                                {t.lastMonth}
+                            </button>
+                            <button
+                                onClick={() => setQuickDate('yesterday')}
+                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap ${isYesterday
+                                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                    : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                    }`}
+                            >
+                                {t.yesterday || 'Yesterday'}
+                            </button>
+                            <button
+                                onClick={() => setQuickDate('thisMonth')}
+                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap ${isThisMonth
+                                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                    : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                    }`}
+                            >
+                                {t.thisMonth}
+                            </button>
+                            <button
+                                onClick={() => setQuickDate('today')}
+                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap ${isToday
+                                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                    : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                    }`}
+                            >
+                                {t.today || 'Today'}
+                            </button>
+                        </div>
                         <div className="min-w-[180px] flex-shrink-0">
                             <DateRangePicker
                                 startDate={startDate}

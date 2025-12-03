@@ -28,7 +28,7 @@ type QueueItem = {
 class RequestQueue {
     private queue: QueueItem[] = [];
     private isProcessing = false;
-    private delayMs = 3000; // 3 seconds delay
+    private delayMs = 1000;// 3 seconds delay
 
     add(term: string, country: string, appId: string): Promise<number | null> {
         return new Promise((resolve, reject) => {
