@@ -152,6 +152,8 @@ export const translations = {
         avgAppStoreRanking: 'Avg. App Store Ranking',
         across: 'across',
         keywords: 'keywords',
+        countries: 'countries',
+        pushes: 'Active Pushes',
         geos: 'Geos',
 
         // Real-Time Standings
@@ -317,7 +319,9 @@ export const translations = {
         dailyCosts: 'Расходы по дням',
         avgAppStoreRanking: 'Средняя позиция в App Store',
         across: 'по',
-        keywords: 'ключам',
+        keywords: 'ключей',
+        countries: 'стран',
+        pushes: 'Активных Пушей',
         geos: 'гео',
 
         // Real-Time Standings

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Upload, Plus, FileText, CheckCircle, Smartphone, FolderPlus, Layers, Table } from 'lucide-react';
+import { X, Upload, Plus, FileText, CheckCircle, Smartphone, FolderPlus, Layers, Table, RefreshCw } from 'lucide-react';
 import { fetchSheetTabs, fetchSheetData, processSheetData } from '../services/googleSheets';
 import { supabase } from '../lib/supabase';
 import { AsoEntry } from '../types';
@@ -672,7 +672,34 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                                 </div>
 
                                                 <div>
-                                                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase block mb-1">Synced Tabs</label>
+                                                    <div className="flex justify-between items-end mb-1">
+                                                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Synced Tabs</label>
+                                                        <button
+                                                            onClick={async () => {
+                                                                setIsFetchingTabs(true);
+                                                                try {
+                                                                    const tabs = await fetchSheetTabs(webAppUrl);
+                                                                    setSheetTabs(tabs);
+                                                                    // Keep existing selection, but filter out tabs that no longer exist
+                                                                    const newSet = new Set<string>();
+                                                                    selectedTabs.forEach(t => {
+                                                                        if (tabs.includes(t)) newSet.add(t);
+                                                                    });
+                                                                    setSelectedTabs(newSet);
+                                                                    alert(`Tabs refreshed! Found ${tabs.length} tabs.`);
+                                                                } catch (error: any) {
+                                                                    alert(`Failed to refresh tabs: ${error.message}`);
+                                                                } finally {
+                                                                    setIsFetchingTabs(false);
+                                                                }
+                                                            }}
+                                                            disabled={isFetchingTabs}
+                                                            className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center gap-1"
+                                                        >
+                                                            <RefreshCw size={12} className={isFetchingTabs ? "animate-spin" : ""} />
+                                                            {isFetchingTabs ? "Refreshing..." : "Refresh Tabs"}
+                                                        </button>
+                                                    </div>
                                                     <div className="flex flex-wrap gap-2">
                                                         {Array.from(selectedTabs).map(tab => (
                                                             <span key={tab} className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs text-slate-700 dark:text-slate-300">

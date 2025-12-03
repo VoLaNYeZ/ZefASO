@@ -356,7 +356,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </div>
 
             {/* Hero Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div className="relative overflow-hidden rounded-3xl p-8 bg-gradient-to-br from-indigo-600 via-purple-600 to-fuchsia-600 text-white shadow-2xl shadow-indigo-500/20 group hover:scale-[1.01] transition-transform duration-300">
                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
                         <DollarSign size={180} strokeWidth={1} />
@@ -387,6 +387,54 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                         </div>
                         <p className="mt-4 text-slate-300 font-medium opacity-90">
                             {t.trackedDataMsg} {startDate || 'Start'} - {endDate || 'Now'}.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="relative overflow-hidden rounded-3xl p-8 bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 text-white shadow-2xl shadow-purple-500/20 group hover:scale-[1.01] transition-transform duration-300">
+                    <div className="absolute -top-10 -right-10 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <LayoutTemplate size={200} strokeWidth={1} />
+                    </div>
+                    <div className="relative z-10">
+                        <div className="flex items-center gap-2 mb-2 text-purple-100 font-bold uppercase tracking-wider text-sm">
+                            <LayoutTemplate size={16} /> {t.pushes || 'Active Pushes'}
+                        </div>
+                        <div className="text-6xl sm:text-7xl font-black tracking-tighter">
+                            {(() => {
+                                const uniquePushes = new Set();
+                                aggregatedData.forEach(app => {
+                                    app.groups.forEach(group => {
+                                        if (overviewMode === 'keyword') {
+                                            group.items.forEach(item => {
+                                                uniquePushes.add(`${group.id}|${item.label}`);
+                                            });
+                                        } else {
+                                            group.items.forEach(item => {
+                                                uniquePushes.add(`${item.label}|${group.id}`);
+                                            });
+                                        }
+                                    });
+                                });
+                                return uniquePushes.size;
+                            })()}
+                        </div>
+                        <p className="mt-4 text-purple-100 font-medium opacity-90">
+                            {(() => {
+                                const uniqueKeywords = new Set();
+                                const uniqueGeos = new Set();
+                                aggregatedData.forEach(app => {
+                                    app.groups.forEach(group => {
+                                        if (overviewMode === 'keyword') {
+                                            uniqueKeywords.add(group.id);
+                                            group.items.forEach(item => uniqueGeos.add(item.label));
+                                        } else {
+                                            uniqueGeos.add(group.id);
+                                            group.items.forEach(item => uniqueKeywords.add(item.label));
+                                        }
+                                    });
+                                });
+                                return `${uniqueKeywords.size} ${t.keywords || 'keywords'} • ${uniqueGeos.size} ${t.countries || 'countries'}`;
+                            })()}
                         </p>
                     </div>
                 </div>

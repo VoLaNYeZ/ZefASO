@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 interface DateRangePickerProps {
@@ -28,6 +29,8 @@ const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month
 export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, onChange, theme, t, variant = 'default' }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
 
   // Internal state for the picker (before applying)
   const [tempStart, setTempStart] = useState<string | null>(startDate);
@@ -39,7 +42,11 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
   // Close on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const isContainer = containerRef.current && containerRef.current.contains(target);
+      const isDropdown = dropdownRef.current && dropdownRef.current.contains(target);
+
+      if (!isContainer && !isDropdown) {
         setIsOpen(false);
       }
     };
@@ -47,14 +54,33 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Reset temp state when opening
+  // Close on scroll to prevent detached floating
+  useEffect(() => {
+    const handleScroll = () => {
+      if (isOpen) setIsOpen(false);
+    };
+    if (isOpen) {
+      window.addEventListener('scroll', handleScroll, { capture: true });
+    }
+    return () => window.removeEventListener('scroll', handleScroll, { capture: true });
+  }, [isOpen]);
+
+  // Reset temp state when opening & Calculate Position
   useEffect(() => {
     if (isOpen) {
       setTempStart(startDate);
       setTempEnd(endDate);
       if (endDate) {
-        // If we have an end date, try to show that month, or the start month
         setViewDate(toDate(endDate));
+      }
+
+      // Calculate Position
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setDropdownPos({
+          top: rect.bottom + 8, // 8px gap
+          right: window.innerWidth - rect.right
+        });
       }
     }
   }, [isOpen, startDate, endDate]);
@@ -70,7 +96,6 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
 
   const handlePreset = (days: number | 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'all') => {
     const today = new Date();
-    // Reset hours to avoid any weirdness
     today.setHours(0, 0, 0, 0);
 
     let start: Date;
@@ -91,7 +116,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
       end = new Date(start);
     } else if (days === 'thisMonth') {
       start = new Date(today.getFullYear(), today.getMonth(), 1);
-      end = new Date(today); // Month to date
+      end = new Date(today);
     } else if (days === 'lastMonth') {
       start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       end = new Date(today.getFullYear(), today.getMonth(), 0);
@@ -100,23 +125,20 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
       start = new Date(today);
       start.setDate(today.getDate() - (days - 1));
     } else {
-      // Fallback
       start = new Date(today);
       end = new Date(today);
     }
 
     setTempStart(toStr(start));
     setTempEnd(toStr(end));
-    setViewDate(end); // Show the end of the range
+    setViewDate(end);
   };
 
   const handleDateClick = (dateStr: string) => {
     if (!tempStart || (tempStart && tempEnd)) {
-      // Start a new selection
       setTempStart(dateStr);
       setTempEnd(null);
     } else {
-      // Complete selection
       if (dateStr < tempStart) {
         setTempEnd(tempStart);
         setTempStart(dateStr);
@@ -137,10 +159,9 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
     const year = currentMonthDate.getFullYear();
     const month = currentMonthDate.getMonth();
     const daysInMonth = getDaysInMonth(year, month);
-    const firstDay = getFirstDayOfMonth(year, month); // 0 = Sun
+    const firstDay = getFirstDayOfMonth(year, month);
 
     const days = [];
-    // Empty slots for start of month
     for (let i = 0; i < firstDay; i++) {
       days.push(<div key={`empty-${offset}-${i}`} className="h-8 w-8" />);
     }
@@ -222,93 +243,106 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
 
       {isOpen && (
         <>
-          {/* Mobile: Fullscreen Modal */}
-          <div className="md:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={handleCancel}>
-            <div className="fixed inset-x-0 bottom-0 bg-white dark:bg-slate-900 rounded-t-2xl shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-              {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
-                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.selectDateRange || 'Select Date Range'}</h3>
-                <button onClick={handleCancel} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
-                  <X size={20} className="text-slate-500 dark:text-slate-400" />
-                </button>
-              </div>
-
-              {/* Scrollable Content */}
-              <div className="flex-1 overflow-y-auto p-4">
-                {/* Preset Buttons - Horizontal Grid */}
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  <button onClick={() => handlePreset('today')} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.today}</button>
-                  <button onClick={() => handlePreset('yesterday')} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.yesterday}</button>
-                  <button onClick={() => handlePreset(7)} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last7Days}</button>
-                  <button onClick={() => handlePreset(30)} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last30Days}</button>
-                  <button onClick={() => handlePreset(90)} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last3Months}</button>
-                  <button onClick={() => handlePreset('thisMonth')} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.thisMonth}</button>
-                  <button onClick={() => handlePreset('lastMonth')} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.lastMonth}</button>
-                  <button onClick={() => handlePreset('all')} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.allTime}</button>
+          {/* Mobile: Fullscreen Modal (Portal not strictly needed for fixed inset-0, but consistent) */}
+          {createPortal(
+            <div className="md:hidden fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={handleCancel}>
+              <div className="fixed inset-x-0 bottom-0 bg-white dark:bg-slate-900 rounded-t-2xl shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
+                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.selectDateRange || 'Select Date Range'}</h3>
+                  <button onClick={handleCancel} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                    <X size={20} className="text-slate-500 dark:text-slate-400" />
+                  </button>
                 </div>
 
-                {/* Calendar Navigation */}
-                <div className="flex items-center justify-between mb-2">
-                  <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400">
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  {/* Preset Buttons */}
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    <button onClick={() => handlePreset('today')} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.today}</button>
+                    <button onClick={() => handlePreset('yesterday')} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.yesterday}</button>
+                    <button onClick={() => handlePreset(7)} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last7Days}</button>
+                    <button onClick={() => handlePreset(30)} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last30Days}</button>
+                    <button onClick={() => handlePreset(90)} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last3Months}</button>
+                    <button onClick={() => handlePreset('thisMonth')} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.thisMonth}</button>
+                    <button onClick={() => handlePreset('lastMonth')} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.lastMonth}</button>
+                    <button onClick={() => handlePreset('all')} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.allTime}</button>
+                  </div>
+
+                  {/* Calendar Navigation */}
+                  <div className="flex items-center justify-between mb-2">
+                    <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400">
+                      <ChevronLeft size={20} />
+                    </button>
+                    <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      {viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    </div>
+                    <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400">
+                      <ChevronRight size={20} />
+                    </button>
+                  </div>
+
+                  {/* Single Calendar */}
+                  {renderCalendar(0)}
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+                  <button onClick={handleCancel} className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">{t.cancel}</button>
+                  <button onClick={handleApply} className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors">{t.applyRange}</button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
+
+          {/* Desktop: Dropdown via Portal */}
+          {dropdownPos && createPortal(
+            <div
+              ref={dropdownRef}
+              style={{
+                top: dropdownPos.top,
+                right: dropdownPos.right,
+              }}
+              className="hidden md:flex fixed z-[100] bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            >
+              {/* Presets Sidebar */}
+              <div className="w-40 bg-slate-50 dark:bg-slate-800/50 border-r border-slate-200 dark:border-slate-800 p-2 flex flex-col gap-1">
+                <button onClick={() => handlePreset('today')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.today}</button>
+                <button onClick={() => handlePreset('yesterday')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.yesterday}</button>
+                <button onClick={() => handlePreset(7)} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last7Days}</button>
+                <button onClick={() => handlePreset(30)} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last30Days}</button>
+                <button onClick={() => handlePreset(90)} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last3Months}</button>
+                <button onClick={() => handlePreset('thisMonth')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.thisMonth}</button>
+                <button onClick={() => handlePreset('lastMonth')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.lastMonth}</button>
+                <div className="h-px bg-slate-200 dark:bg-slate-700 my-1"></div>
+                <button onClick={() => handlePreset('all')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.allTime}</button>
+              </div>
+
+              {/* Calendars Area */}
+              <div>
+                <div className="flex items-start justify-center p-2 border-b border-slate-100 dark:border-slate-800">
+                  <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400">
                     <ChevronLeft size={20} />
                   </button>
-                  <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                  </div>
-                  <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400">
+                  <div className="flex-1"></div>
+                  <button onClick={() => changeMonth(1)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400">
                     <ChevronRight size={20} />
                   </button>
                 </div>
-
-                {/* Single Calendar */}
-                {renderCalendar(0)}
+                <div className="flex">
+                  {renderCalendar(-1)}
+                  <div className="w-px bg-slate-100 dark:bg-slate-800 my-4"></div>
+                  {renderCalendar(0)}
+                </div>
+                <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+                  <button onClick={handleCancel} className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">{t.cancel}</button>
+                  <button onClick={handleApply} className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors">{t.applyRange}</button>
+                </div>
               </div>
-
-              {/* Footer Buttons */}
-              <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
-                <button onClick={handleCancel} className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">{t.cancel}</button>
-                <button onClick={handleApply} className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors">{t.applyRange}</button>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop: Dropdown */}
-          <div className="hidden md:flex absolute right-0 top-full mt-2 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            {/* Presets Sidebar */}
-            <div className="w-40 bg-slate-50 dark:bg-slate-800/50 border-r border-slate-200 dark:border-slate-800 p-2 flex flex-col gap-1">
-              <button onClick={() => handlePreset('today')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.today}</button>
-              <button onClick={() => handlePreset('yesterday')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.yesterday}</button>
-              <button onClick={() => handlePreset(7)} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last7Days}</button>
-              <button onClick={() => handlePreset(30)} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last30Days}</button>
-              <button onClick={() => handlePreset(90)} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last3Months}</button>
-              <button onClick={() => handlePreset('thisMonth')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.thisMonth}</button>
-              <button onClick={() => handlePreset('lastMonth')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.lastMonth}</button>
-              <div className="h-px bg-slate-200 dark:bg-slate-700 my-1"></div>
-              <button onClick={() => handlePreset('all')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.allTime}</button>
-            </div>
-
-            {/* Calendars Area */}
-            <div>
-              <div className="flex items-start justify-center p-2 border-b border-slate-100 dark:border-slate-800">
-                <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400">
-                  <ChevronLeft size={20} />
-                </button>
-                <div className="flex-1"></div>
-                <button onClick={() => changeMonth(1)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400">
-                  <ChevronRight size={20} />
-                </button>
-              </div>
-              <div className="flex">
-                {renderCalendar(-1)}
-                <div className="w-px bg-slate-100 dark:bg-slate-800 my-4"></div>
-                {renderCalendar(0)}
-              </div>
-              <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
-                <button onClick={handleCancel} className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">{t.cancel}</button>
-                <button onClick={handleApply} className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors">{t.applyRange}</button>
-              </div>
-            </div>
-          </div>
+            </div>,
+            document.body
+          )}
         </>
       )}
     </div>
