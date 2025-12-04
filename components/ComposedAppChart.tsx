@@ -275,7 +275,7 @@ export const ComposedAppChart: React.FC<ComposedAppChartProps> = ({
                 {chartData.length === 0 ? (
                     <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">No data matching these filters.</div>
                 ) : (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={200}>
                         <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                             <CartesianGrid stroke={gridColor} vertical={false} strokeDasharray="3 3" />
                             <XAxis

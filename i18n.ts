@@ -33,6 +33,7 @@ export const translations = {
         aiAnalysis: 'AI Analysis',
         analyzing: 'Analyzing...',
         runAnalysis: 'Run Analysis',
+        aiAnalysisError: 'Failed to generate analysis. Please try again later.',
 
         // Data Management
         dataManagement: 'Data Management',
@@ -160,6 +161,17 @@ export const translations = {
         realTimeStandings: 'Real-Time Standings (iTunes)',
         refreshAll: 'Refresh All',
 
+        // Keyword Suggester
+        keywordSuggester: 'Keyword Suggester',
+        generateKeywords: 'Generate keywords for',
+        in: 'in',
+        copyAll: 'Copy All',
+        copied: 'Copied',
+        generate: 'Generate',
+        regenerate: 'Regenerate',
+        clickToCopy: 'Click to copy',
+        keywordSuggesterError: 'Failed to generate keywords. Please try again later.',
+
         // Top 5 Feature
         viewTop5: 'View Top 5',
         top5Apps: 'Top 5 Apps',
@@ -201,6 +213,7 @@ export const translations = {
         aiAnalysis: 'AI Анализ',
         analyzing: 'Анализ...',
         runAnalysis: 'Запустить анализ',
+        aiAnalysisError: 'Не удалось создать анализ. Попробуйте позже.',
 
         // Data Management
         dataManagement: 'Управление данными',
@@ -327,6 +340,17 @@ export const translations = {
         // Real-Time Standings
         realTimeStandings: 'Позиции в реальном времени (iTunes)',
         refreshAll: 'Обновить все',
+
+        // Keyword Suggester
+        keywordSuggester: 'Генератор ключей',
+        generateKeywords: 'Идеи ключей для',
+        in: 'в',
+        copyAll: 'Скопировать все',
+        copied: 'Скопировано',
+        generate: 'Сгенерировать',
+        regenerate: 'Пересоздать',
+        clickToCopy: 'Нажмите для копирования',
+        keywordSuggesterError: 'Не удалось сгенерировать ключи. Попробуйте позже.',
 
         // Top 5 Feature
         viewTop5: 'Топ 5',

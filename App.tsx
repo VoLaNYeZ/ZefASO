@@ -55,10 +55,11 @@ import { translations } from './i18n';
 import { DashboardCharts } from './components/DashboardCharts';
 import { DataUploadModal } from './components/DataUploadModal';
 import { DateRangePicker } from './components/DateRangePicker';
-import { analyzeASOTrends } from './services/geminiService';
+import { analyzeASOTrends } from './services/openaiService';
 import { OverviewDashboard } from './components/OverviewDashboard';
 import { RealtimeStandings } from './components/RealtimeStandings';
 import { ComparisonDashboard } from './components/ComparisonDashboard';
+import { KeywordSuggester } from './components/KeywordSuggester';
 import { supabase } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
@@ -66,6 +67,7 @@ import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPre
 import { fetchSheetData, processSheetData } from './services/googleSheets';
 
 const App = () => {
+    const mainContentRef = useRef<HTMLDivElement>(null);
     // -- Auth State --
     const [session, setSession] = useState<Session | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
@@ -490,6 +492,14 @@ const App = () => {
         return res.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }, [data, filters]);
 
+    // Get all unique keywords for the current app to pass to suggester
+    const allAppKeywords = useMemo(() => {
+        if (!filters.appName) return [];
+        return Array.from(new Set(data
+            .filter(d => d.appName === filters.appName)
+            .map(d => d.keyword)));
+    }, [data, filters.appName]);
+
     // Summary Logic
     const summary = useMemo(() => {
         if (filteredData.length === 0) return { installs: 0, rank: 0, cost: 0, keywordCount: 0, geoCount: 0 };
@@ -782,14 +792,26 @@ const App = () => {
     const runAnalysis = async () => {
         setIsAnalyzing(true);
         setAiAnalysis(null);
+
+        // Scroll to bottom immediately to show we are working
+        setTimeout(() => {
+            mainContentRef.current?.scrollTo({ top: mainContentRef.current.scrollHeight, behavior: 'smooth' });
+        }, 100);
+
         const result = await analyzeASOTrends(
             filteredData,
             filters.appName || 'Unknown',
             filters.geo,
-            filters.keyword
+            filters.keyword,
+            lang
         );
         setAiAnalysis(result);
         setIsAnalyzing(false);
+
+        // Scroll again to show result
+        setTimeout(() => {
+            mainContentRef.current?.scrollTo({ top: mainContentRef.current.scrollHeight, behavior: 'smooth' });
+        }, 100);
     };
 
     // -- Category Management Handlers (Using Modal) --
@@ -1524,7 +1546,7 @@ const App = () => {
                         </header>
 
                         {/* Dashboard Main Scrollable Area */}
-                        <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 p-6 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 pb-20">
+                        <div ref={mainContentRef} className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 p-6 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 pb-20">
                             {/* KPI Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                                 <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">
@@ -1663,15 +1685,34 @@ const App = () => {
                                         <BrainCircuit className="text-white animate-pulse" size={24} />
                                         <h3 className="text-lg font-bold text-white">{t.aiAnalysis}</h3>
                                     </div>
-                                    <div className="p-6 prose prose-slate dark:prose-invert max-w-none">
-                                        <div dangerouslySetInnerHTML={{
-                                            __html: aiAnalysis
-                                                .replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-800 dark:text-slate-200 font-bold">$1</strong>')
-                                                .replace(/\* (.*?)\n/g, '<li class="ml-4 list-disc text-slate-700 dark:text-slate-300">$1</li>')
-                                                .replace(/\n/g, '<br />')
-                                        }} />
+                                    <div className="p-6">
+                                        {aiAnalysis.startsWith('Failed') || aiAnalysis.startsWith('API Key is missing') ? (
+                                            <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg">
+                                                <p className="text-sm text-red-600 dark:text-red-400 text-center">{t.aiAnalysisError}</p>
+                                            </div>
+                                        ) : (
+                                            <div className="prose prose-slate dark:prose-invert max-w-none">
+                                                <div dangerouslySetInnerHTML={{
+                                                    __html: aiAnalysis
+                                                        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-800 dark:text-slate-200 font-bold">$1</strong>')
+                                                        .replace(/\* (.*?)\n/g, '<li class="ml-4 list-disc text-slate-700 dark:text-slate-300">$1</li>')
+                                                        .replace(/\n/g, '<br />')
+                                                }} />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
+                            )}
+
+                            {/* Keyword Suggester Section */}
+                            {filters.appName && (
+                                <KeywordSuggester
+                                    appName={filters.appName}
+                                    geo={filters.geo}
+                                    existingKeywords={allAppKeywords}
+                                    theme={theme}
+                                    t={t}
+                                />
                             )}
 
                             {/* Data Management Section */}
