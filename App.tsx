@@ -63,7 +63,7 @@ import { KeywordSuggester } from './components/KeywordSuggester';
 import { supabase } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
-import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences } from './lib/supabaseService';
+import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, deleteAsoEntriesForApp } from './lib/supabaseService';
 import { fetchSheetData, processSheetData } from './services/googleSheets';
 
 const App = () => {
@@ -121,13 +121,27 @@ const App = () => {
         const loadInitialData = async () => {
             setDataLoading(true);
             try {
-                const [asoData, appSettings, userPrefs] = await Promise.all([
+                const [asoData, appSettings, userPrefs, hasSyncConfig] = await Promise.all([
                     loadAsoData(),
                     loadAppSettings(),
-                    loadUserPreferences()
+                    loadUserPreferences(),
+                    checkGoogleSheetsSyncExists()
                 ]);
 
-                setData(asoData.length > 0 ? asoData : INITIAL_DATA);
+                // Only show INITIAL_DATA if:
+                // 1. No data loaded AND
+                // 2. No Google Sheets sync configured (new user experience)
+                // If sync is configured but no data, show empty state (sync may be pending)
+                if (asoData.length > 0) {
+                    setData(asoData);
+                } else if (!hasSyncConfig) {
+                    // New user without sync - show demo data
+                    setData(INITIAL_DATA);
+                } else {
+                    // Sync configured but no data yet - empty state
+                    setData([]);
+                }
+
                 setAppIcons(appSettings.appIcons);
                 setCategories(appSettings.categories);
                 setAppCategoryMap(appSettings.appCategoryMap);
@@ -140,8 +154,8 @@ const App = () => {
                 currentUserId.current = userId;
             } catch (error) {
                 console.error('Error loading data from Supabase:', error);
-                // Fallback to INITIAL_DATA on error
-                setData(INITIAL_DATA);
+                // On error, show empty state instead of potentially confusing demo data
+                setData([]);
             } finally {
                 setDataLoading(false);
             }
@@ -677,11 +691,16 @@ const App = () => {
         }
     };
 
-    const confirmDeleteApp = () => {
+    const confirmDeleteApp = async () => {
         if (!deleteConfirmation) return;
 
         const appName = deleteConfirmation;
         const appIdToDelete = appResolution.nameToId[appName];
+
+        // Delete from database explicitly
+        if (appIdToDelete) {
+            await deleteAsoEntriesForApp(appIdToDelete);
+        }
 
         // Filter out all entries for this app (by ID if possible, else Name)
         const newData = data.filter(d => appIdToDelete ? d.appId !== appIdToDelete : d.appName !== appName);

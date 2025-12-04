@@ -54,23 +54,66 @@ export const saveAsoData = async (entries: AsoEntry[]): Promise<void> => {
         cpi: entry.cpi
     }));
 
-    // Delete all existing entries for this user
-    await supabase
-        .from('aso_entries')
-        .delete()
-        .eq('user_id', userId);
-
-    // Insert new entries in batches (Supabase has limits)
+    // Use UPSERT pattern - merge new data with existing
+    // This prevents data loss if sync fails or partial data is sent
     const batchSize = 500;
     for (let i = 0; i < dbEntries.length; i += batchSize) {
         const batch = dbEntries.slice(i, i + batchSize);
         const { error } = await supabase
             .from('aso_entries')
-            .insert(batch);
+            .upsert(batch, {
+                onConflict: 'user_id,date,app_id,geo,keyword',
+                ignoreDuplicates: false // Update existing entries
+            });
 
         if (error) {
             console.error('Error saving ASO data batch:', error);
         }
+    }
+};
+
+// Check if user has Google Sheets sync configured
+export const checkGoogleSheetsSyncExists = async (): Promise<boolean> => {
+    try {
+        const userId = await getUserId();
+        const { data, error } = await supabase
+            .from('google_sheets_sync')
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        return !error && data !== null;
+    } catch {
+        return false;
+    }
+};
+
+// Delete all ASO entries for a specific app (explicit deletion)
+export const deleteAsoEntriesForApp = async (appId: string): Promise<void> => {
+    const userId = await getUserId();
+
+    const { error } = await supabase
+        .from('aso_entries')
+        .delete()
+        .eq('user_id', userId)
+        .eq('app_id', appId);
+
+    if (error) {
+        console.error('Error deleting app entries:', error);
+    }
+};
+
+// Delete all ASO entries for user (for explicit "delete all" action)
+export const deleteAllAsoEntries = async (): Promise<void> => {
+    const userId = await getUserId();
+
+    const { error } = await supabase
+        .from('aso_entries')
+        .delete()
+        .eq('user_id', userId);
+
+    if (error) {
+        console.error('Error deleting all entries:', error);
     }
 };
 

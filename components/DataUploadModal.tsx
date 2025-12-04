@@ -39,6 +39,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
     const [isFetchingTabs, setIsFetchingTabs] = useState(false);
     const [isImportingSheet, setIsImportingSheet] = useState(false);
     const [hasSavedSync, setHasSavedSync] = useState(false);
+    const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
     // Manual Form State
     const [manualFormData, setManualFormData] = useState({
@@ -85,6 +86,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
             setSheetTabs(data.selected_tabs || []);
             setSelectedTabs(new Set(data.selected_tabs || []));
             setIsSyncEnabled(data.is_sync_enabled);
+            setLastSyncedAt(data.last_synced_at || null);
             setHasSavedSync(true);
         }
     };
@@ -519,6 +521,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                 if (isSyncEnabled) {
                     const { data: { user } } = await supabase.auth.getUser();
                     if (user) {
+                        const now = new Date().toISOString();
                         const { error } = await supabase
                             .from('google_sheets_sync')
                             .upsert({
@@ -526,13 +529,14 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                 web_app_url: webAppUrl,
                                 is_sync_enabled: true,
                                 selected_tabs: Array.from(selectedTabs),
-                                last_synced_at: new Date().toISOString()
+                                last_synced_at: now
                             });
                         if (error) {
                             console.error("Failed to save sync settings:", error);
                             alert("Data imported, but failed to save sync settings: " + error.message);
                         } else {
                             console.log("Sync settings saved successfully.");
+                            setLastSyncedAt(now); // Update local state
                         }
                     }
                 }
@@ -705,9 +709,16 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                 <div className="mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
                                     {hasSavedSync ? (
                                         <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
-                                            <div className="flex items-center space-x-2 mb-3">
-                                                <CheckCircle className="text-emerald-600 dark:text-emerald-400" size={20} />
-                                                <h3 className="font-bold text-emerald-800 dark:text-emerald-300">Sync Active</h3>
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center space-x-2">
+                                                    <CheckCircle className="text-emerald-600 dark:text-emerald-400" size={20} />
+                                                    <h3 className="font-bold text-emerald-800 dark:text-emerald-300">Sync Active</h3>
+                                                </div>
+                                                {lastSyncedAt && (
+                                                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                                                        Last sync: {new Date(lastSyncedAt).toLocaleDateString('en-GB')} {new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                )}
                                             </div>
 
                                             <div className="space-y-3">
