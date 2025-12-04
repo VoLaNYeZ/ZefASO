@@ -1,18 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
+
+const WELCOME_TEXTS = [
+    { text: 'Welcome Back', lang: 'en' },
+    { text: 'С возвращением', lang: 'ru' },
+    { text: 'مرحباً بعودتك', lang: 'ar' },
+    { text: 'З поверненням', lang: 'uk' },
+    { text: 'Bon retour', lang: 'fr' },
+];
 
 export const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [isAnimating, setIsAnimating] = useState(false);
 
-    React.useEffect(() => {
+    useEffect(() => {
         document.documentElement.classList.add('dark');
         return () => {
             document.documentElement.classList.remove('dark');
         };
+    }, []);
+
+    // Cycle through welcome texts
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setIsAnimating(true);
+            setTimeout(() => {
+                setCurrentIndex((prev) => (prev + 1) % WELCOME_TEXTS.length);
+                setIsAnimating(false);
+            }, 400);
+        }, 3000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -34,6 +57,8 @@ export const LoginPage: React.FC = () => {
         }
     };
 
+    const currentWelcome = WELCOME_TEXTS[currentIndex];
+
     return (
         <div className="min-h-[100dvh] bg-slate-950 flex items-center justify-center p-4">
             <div className="max-w-md w-full bg-slate-900 rounded-2xl shadow-xl border border-slate-800 overflow-hidden">
@@ -42,7 +67,22 @@ export const LoginPage: React.FC = () => {
                         <div className="w-16 h-16 bg-indigo-600 rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/30">
                             <Lock className="text-white" size={32} />
                         </div>
-                        <h1 className="text-2xl font-black text-white mb-2">Welcome Back</h1>
+
+                        {/* Animated Welcome Text - fade + scale, no cutting */}
+                        <div className="h-10 flex items-center justify-center mb-2">
+                            <h1
+                                className={`text-2xl font-black text-white transition-all duration-500 ease-out ${isAnimating
+                                        ? 'opacity-0 scale-95 blur-sm'
+                                        : 'opacity-100 scale-100 blur-0'
+                                    }`}
+                                style={{
+                                    direction: currentWelcome.lang === 'ar' ? 'rtl' : 'ltr'
+                                }}
+                            >
+                                {currentWelcome.text}
+                            </h1>
+                        </div>
+
                         <p className="text-slate-400">Sign in to access your dashboard</p>
                     </div>
 
