@@ -240,6 +240,54 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
         console.warn(`Unknown country name: "${trimmed}" - using as-is`);
         return trimmed;
     };
+    const parseLine = (line: string): string[] => {
+        const hasTab = line.includes('\t');
+        const hasComma = line.includes(',');
+
+        const splitWithSeparator = (separator: string): string[] => {
+            const result: string[] = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+
+                if (char === '"') {
+                    // Toggle quotes unless it's an escaped quote
+                    if (inQuotes && line[i + 1] === '"') {
+                        current += '"';
+                        i++; // Skip the escaped quote
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === separator && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+
+            result.push(current.trim());
+            return result;
+        };
+
+        if (hasTab || hasComma) {
+            // Prefer tabs if present, otherwise fallback to comma-separated parsing
+            return splitWithSeparator(hasTab ? '\t' : ',');
+        }
+
+        // Fallback: split by whitespace but keep quoted sections intact
+        const tokens: string[] = [];
+        const regex = /"([^"]*)"|(\S+)/g;
+        let match;
+
+        while ((match = regex.exec(line)) !== null) {
+            tokens.push((match[1] || match[2]).trim());
+        }
+
+        return tokens;
+    };
 
     const parseAndSubmit = (text: string, forcedAppName?: string) => {
         const lines = text.trim().split('\n');
@@ -251,8 +299,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
 
         lines.forEach((line, index) => {
             // Determine separator: usually tab from Sheets/Excel, or comma from CSV
-            const separator = line.includes('\t') ? '\t' : ',';
-            const cols = line.split(separator).map(c => c.trim().replace(/^"|"$/g, '')); // trim whitespace and quotes
+            const cols = parseLine(line).map(c => c.replace(/^"|"$/g, ''));
 
             // Skip empty lines or lines with just separators
             if (!line.trim() || cols.every(c => !c)) {
