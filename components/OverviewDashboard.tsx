@@ -340,10 +340,10 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     <div className="h-px sm:h-auto sm:w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="grid grid-cols-2 gap-0.5 h-[34px] w-[140px]">
+                        <div className="grid grid-cols-2 gap-0.5 h-[34px] w-auto min-w-[140px]">
                             <button
                                 onClick={() => setQuickDate('lastMonth')}
-                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap ${isLastMonth
+                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isLastMonth
                                     ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
                                     : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
                                     }`}
@@ -352,7 +352,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                             </button>
                             <button
                                 onClick={() => setQuickDate('yesterday')}
-                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap ${isYesterday
+                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isYesterday
                                     ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
                                     : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
                                     }`}
@@ -361,7 +361,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                             </button>
                             <button
                                 onClick={() => setQuickDate('thisMonth')}
-                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap ${isThisMonth
+                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isThisMonth
                                     ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
                                     : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
                                     }`}
@@ -370,7 +370,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                             </button>
                             <button
                                 onClick={() => setQuickDate('today')}
-                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap ${isToday
+                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isToday
                                     ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
                                     : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
                                     }`}

@@ -78,7 +78,7 @@ export const checkGoogleSheetsSyncExists = async (): Promise<boolean> => {
         const userId = await getUserId();
         const { data, error } = await supabase
             .from('google_sheets_sync')
-            .select('id')
+            .select('user_id')
             .eq('user_id', userId)
             .maybeSingle();
 
