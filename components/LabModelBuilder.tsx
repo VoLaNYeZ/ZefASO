@@ -88,6 +88,11 @@ export const LabModelBuilder: React.FC<LabModelBuilderProps> = ({ selectedRuns, 
     const duration = modelData.length;
     const maxInstalls = Math.max(...modelData.map(d => d.installs));
     const riskyDays = modelData.filter(d => d.riskLevel === 'high').length;
+    // Suggest a conservative starting point and a simple ramp to reach the model quickly
+    const targetDay = Math.min(3, modelData.length);
+    const rampDays = Math.max(1, targetDay - 1);
+    const conservativeStart = Math.max(5, Math.round(Math.min(modelData[0].installs * 0.6, 20)));
+    const rampStep = Math.max(1, Math.round((modelData[0].installs - conservativeStart) / rampDays));
 
     return (
         <div className="bg-slate-900 dark:bg-slate-950 rounded-3xl overflow-hidden text-white shadow-2xl shadow-indigo-900/40 border border-slate-700 dark:border-slate-800 h-[500px] flex flex-col">
@@ -117,7 +122,7 @@ export const LabModelBuilder: React.FC<LabModelBuilderProps> = ({ selectedRuns, 
                 {/* Chart Section */}
                 <div className="lg:col-span-2 p-6 min-h-[300px] flex flex-col min-w-0">
                     <ResponsiveContainer width="100%" height="100%" minHeight={250}>
-                        <AreaChart data={modelData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                        <AreaChart data={modelData} margin={{ top: 10, right: 30, left: 0, bottom: 15 }}>
                             <defs>
                                 <linearGradient id="colorPlan" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#818cf8" stopOpacity={0.8} />
@@ -129,7 +134,7 @@ export const LabModelBuilder: React.FC<LabModelBuilderProps> = ({ selectedRuns, 
                                 dataKey="day"
                                 stroke="#94a3b8"
                                 tick={{ fontSize: 12 }}
-                                label={{ value: t.campaignDay, position: 'insideBottom', offset: -5, fill: '#64748b', fontSize: 12 }}
+                                label={{ value: t.campaignDay, position: 'insideBottom', offset: -10, fill: '#64748b', fontSize: 12 }}
                             />
                             <YAxis stroke="#94a3b8" tick={{ fontSize: 12 }} />
                             <Tooltip
@@ -194,7 +199,8 @@ export const LabModelBuilder: React.FC<LabModelBuilderProps> = ({ selectedRuns, 
                             <Info size={16} /> {t.recommendation}
                         </div>
                         <p className="text-xs text-indigo-200">
-                            {t.startWith} <strong>{modelData[0]?.installs} {t.installs}</strong> {t.onDay1}.
+                            {t.startWith} <strong>{conservativeStart} {t.installs}</strong> {t.onDay1}, {t.thenRamp}
+                            {' '}<strong>~{rampStep} {t.installs}/{t.perDay}</strong> {t.alignBy} {targetDay}.
                         </p>
                     </div>
                 </div>
