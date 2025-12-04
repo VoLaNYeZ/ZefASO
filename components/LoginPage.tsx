@@ -8,6 +8,13 @@ export const LoginPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    React.useEffect(() => {
+        document.documentElement.classList.add('dark');
+        return () => {
+            document.documentElement.classList.remove('dark');
+        };
+    }, []);
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -28,7 +35,7 @@ export const LoginPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="min-h-[100dvh] bg-slate-950 flex items-center justify-center p-4">
             <div className="max-w-md w-full bg-slate-900 rounded-2xl shadow-xl border border-slate-800 overflow-hidden">
                 <div className="p-8">
                     <div className="text-center mb-8">

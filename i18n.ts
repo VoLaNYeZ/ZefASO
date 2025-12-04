@@ -30,7 +30,7 @@ export const translations = {
         cancel: 'Cancel',
 
         // AI & Analysis
-        aiAnalysis: 'AI Analysis',
+        aiAnalysis: 'Analysis',
         analyzing: 'Analyzing...',
         runAnalysis: 'Run Analysis',
         aiAnalysisError: 'Failed to generate analysis. Please try again later.',
@@ -213,7 +213,7 @@ export const translations = {
         cancel: 'Отмена',
 
         // AI & Analysis
-        aiAnalysis: 'AI Анализ',
+        aiAnalysis: 'Анализ',
         analyzing: 'Анализ...',
         runAnalysis: 'Запустить анализ',
         aiAnalysisError: 'Не удалось создать анализ. Попробуйте позже.',

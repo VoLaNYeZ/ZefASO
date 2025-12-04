@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { RefreshCw, Clock, AlertCircle, CheckCircle2, Trophy, Eye, Activity } from 'lucide-react';
 import { fetchAppRank, fetchTop5Apps, Top5App } from '../lib/itunesService';
 import { loadRealtimeRankings, saveRealtimeRanking, RealtimeRanking, getApiUsage, incrementApiUsage, fetchCountryRankings, CountryRanking } from '../lib/supabaseService';
@@ -195,17 +195,20 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
     };
 
     // Group items by Geo
-    const groupedItems: Record<string, string[]> = {};
-    items.forEach(item => {
-        if (!groupedItems[item.geo]) {
-            groupedItems[item.geo] = [];
-        }
-        if (!groupedItems[item.geo].includes(item.keyword)) {
-            groupedItems[item.geo].push(item.keyword);
-        }
-    });
+    const groupedItems = useMemo(() => {
+        const groups: Record<string, string[]> = {};
+        items.forEach(item => {
+            if (!groups[item.geo]) {
+                groups[item.geo] = [];
+            }
+            if (!groups[item.geo].includes(item.keyword)) {
+                groups[item.geo].push(item.keyword);
+            }
+        });
+        return groups;
+    }, [items]);
 
-    const uniqueGeos = Object.keys(groupedItems).sort();
+    const uniqueGeos = useMemo(() => Object.keys(groupedItems).sort(), [groupedItems]);
 
     if (uniqueGeos.length === 0) {
         return null;
