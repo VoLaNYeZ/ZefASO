@@ -88,6 +88,23 @@ export const checkGoogleSheetsSyncExists = async (): Promise<boolean> => {
     }
 };
 
+// Check if user has ever set up the app (has saved settings)
+// This prevents INITIAL_DATA from reappearing after user deletes all data
+export const checkIsExistingUser = async (): Promise<boolean> => {
+    try {
+        const userId = await getUserId();
+        const { data, error } = await supabase
+            .from('app_settings')
+            .select('user_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        return !error && data !== null;
+    } catch {
+        return false;
+    }
+};
+
 // Delete all ASO entries for a specific app (explicit deletion)
 export const deleteAsoEntriesForApp = async (appId: string): Promise<void> => {
     const userId = await getUserId();

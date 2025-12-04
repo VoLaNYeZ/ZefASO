@@ -63,7 +63,7 @@ import { KeywordSuggester } from './components/KeywordSuggester';
 import { supabase } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
-import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, deleteAsoEntriesForApp } from './lib/supabaseService';
+import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, deleteAsoEntriesForApp } from './lib/supabaseService';
 import { fetchSheetData, processSheetData } from './services/googleSheets';
 
 const App = () => {
@@ -121,24 +121,26 @@ const App = () => {
         const loadInitialData = async () => {
             setDataLoading(true);
             try {
-                const [asoData, appSettings, userPrefs, hasSyncConfig] = await Promise.all([
+                const [asoData, appSettings, userPrefs, hasSyncConfig, isExistingUser] = await Promise.all([
                     loadAsoData(),
                     loadAppSettings(),
                     loadUserPreferences(),
-                    checkGoogleSheetsSyncExists()
+                    checkGoogleSheetsSyncExists(),
+                    checkIsExistingUser()
                 ]);
 
-                // Only show INITIAL_DATA if:
+                // Only show INITIAL_DATA if this is a brand new user:
                 // 1. No data loaded AND
-                // 2. No Google Sheets sync configured (new user experience)
-                // If sync is configured but no data, show empty state (sync may be pending)
+                // 2. No Google Sheets sync configured AND
+                // 3. User has never saved any settings (truly new user)
+                // If user has used the app before but deleted all data → show empty state
                 if (asoData.length > 0) {
                     setData(asoData);
-                } else if (!hasSyncConfig) {
-                    // New user without sync - show demo data
+                } else if (!hasSyncConfig && !isExistingUser) {
+                    // Brand new user - show demo data
                     setData(INITIAL_DATA);
                 } else {
-                    // Sync configured but no data yet - empty state
+                    // Either sync configured OR user has used the app before - show empty state
                     setData([]);
                 }
 
