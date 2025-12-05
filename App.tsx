@@ -1670,7 +1670,7 @@ const App = () => {
                                         ? "bg-gradient-to-br from-amber-50 to-orange-100 border-amber-200 shadow-md text-amber-900 dark:from-red-900/40 dark:to-red-800/40 dark:border-red-800 dark:text-red-100"
                                         : summary.rank > 3 && summary.rank <= 10
                                             ? "bg-gradient-to-br from-emerald-50 to-green-100 border-emerald-200 shadow-sm text-emerald-900 dark:from-blue-900/40 dark:to-blue-800/40 dark:border-blue-800 dark:text-blue-100"
-                                            : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:shadow-md text-slate-800 dark:text-slate-100"
+                                            : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md text-slate-800 dark:text-slate-100"
                                     }`}>
                                     {/* Diagonal Silver Lining for Rank 1 */}
                                     {summary.rank === 1 && (
