@@ -7,13 +7,7 @@ export default defineConfig(() => {
     server: {
       port: 3000,
       host: '0.0.0.0',
-      proxy: {
-        '/asomobile-api': {
-          target: 'https://app.asomobile.net',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/asomobile-api/, '/asomobile-public-api'),
-        },
-      },
+
     },
     plugins: [react()],
     define: {
@@ -25,7 +19,7 @@ export default defineConfig(() => {
       }
     },
     build: {
-      minify: 'terser',
+      minify: 'terser' as const,
       chunkSizeWarningLimit: 1000,
       terserOptions: {
         format: {
