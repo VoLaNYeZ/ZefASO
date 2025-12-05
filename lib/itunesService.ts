@@ -5,12 +5,21 @@ import { withRetry } from '../utils/retry';
 // We'll use a 3-second delay between requests to be safe.
 
 // Helper function to call iTunes API through Supabase Edge Function proxy
-async function fetchThroughProxy(itunesUrl: string): Promise<any> {
+async function fetchThroughProxy(itunesUrl: string, retryCount = 0): Promise<any> {
     const { data, error } = await withRetry(() => supabase.functions.invoke('itunes-proxy', {
         body: { url: itunesUrl }
     }));
 
     if (error) {
+        // Check if it's a rate limit error
+        if (error.message?.includes('429') || error.message?.includes('Rate limited')) {
+            if (retryCount < 3) {
+                // Wait 60 seconds and retry
+                console.warn(`[iTunes] Rate limited, waiting 60s before retry ${retryCount + 1}/3`);
+                await new Promise(r => setTimeout(r, 60000));
+                return fetchThroughProxy(itunesUrl, retryCount + 1);
+            }
+        }
         console.error('[iTunes Proxy] Error:', error);
         throw new Error(`Proxy error: ${error.message}`);
     }
@@ -91,21 +100,9 @@ class RequestQueue {
         // limit=200 to find the app in top 200. If not found, we assume unranked (or > 200).
         const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=${itunesCountry}&entity=software&limit=200`;
 
-        (`[iTunes] -----------------------------------------------------------`);
-        (`[iTunes] Fetching: ${url}`);
-        (`[iTunes] Raw App ID: '${rawAppId}' -> Target App ID: '${targetAppId}'`);
-
         const data = await fetchThroughProxy(url);
 
-        (`[iTunes] Search for "${term}" in ${country} returned ${data.resultCount} results.`);
-
         if (data.resultCount === 0) return null;
-
-        // Debug: Log the first result to see structure
-        if (data.results.length > 0) {
-            const first = data.results[0];
-            (`[iTunes] First result: "${first.trackName}" (ID: ${first.trackId}, Bundle: ${first.bundleId})`);
-        }
 
         // Find index of our app
         // Check both trackId (numeric) and bundleId (string)
@@ -122,17 +119,8 @@ class RequestQueue {
         });
 
         if (index !== -1) {
-            const foundApp = data.results[index];
-            (`[iTunes] ✅ MATCH FOUND at rank ${index + 1}: "${foundApp.trackName}" (ID: ${foundApp.trackId})`);
             return index + 1; // Rank is 1-based
         }
-
-        // Not found - log first 10 results to help debug
-        (`[iTunes] ❌ App not found in top 200. Looking for ID: '${trimmedTargetId}'`);
-        (`[iTunes] First 10 results for debugging:`);
-        data.results.slice(0, 10).forEach((app: any, i: number) => {
-            (`  ${i + 1}. "${app.trackName}" - ID: ${app.trackId}, Bundle: ${app.bundleId || 'N/A'}`);
-        });
 
         return null; // Not found in top 200
     }
@@ -172,8 +160,6 @@ export const fetchTop5Apps = async (term: string, country: string): Promise<Top5
 
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=${itunesCountry}&entity=software&limit=200`;
 
-    (`[iTunes Top5] Fetching top 5 for "${term}" in ${country}`);
-
     const data = await fetchThroughProxy(url);
 
     if (data.resultCount === 0) return [];
@@ -192,8 +178,6 @@ export const fetchTop5Apps = async (term: string, country: string): Promise<Top5
         genres: app.genres || [],
         trackViewUrl: app.trackViewUrl || `https://apps.apple.com/app/id${app.trackId}`
     }));
-
-    (`[iTunes Top5] Found ${top5.length} apps`);
 
     return top5;
 };

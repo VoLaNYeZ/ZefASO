@@ -29,6 +29,15 @@ export const fetchTrafficData = async (keyword: string, geo: string): Promise<Tr
         throw new Error('ASOMobile API Key is missing. Please add VITE_ASO_MOBILE_API_KEY to your .env.local file.');
     }
 
+    // Map non-standard country codes to ISO 3166-1 alpha-2
+    const countryMap: Record<string, string> = {
+        'UK': 'GB',
+        'SW': 'SE',
+        'EN': 'US',
+    };
+    const upperGeo = geo.toUpperCase();
+    const mappedGeo = countryMap[upperGeo] || upperGeo;
+
     const headers = {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
@@ -36,7 +45,7 @@ export const fetchTrafficData = async (keyword: string, geo: string): Promise<Tr
 
     // 1. Create Ticket
     // Note: The API requires platform and ios_device. Assuming IOS/IPHONE for now as this seems to be an iOS ASO tool.
-    const checkUrl = `${API_BASE_URL}/keyword-check/?platform=IOS&ios_device=IPHONE&country=${geo}&keyword=${encodeURIComponent(keyword)}`;
+    const checkUrl = `${API_BASE_URL}/keyword-check/?platform=IOS&ios_device=IPHONE&country=${mappedGeo}&keyword=${encodeURIComponent(keyword)}`;
 
     const checkResponse = await fetch(checkUrl, { method: 'GET', headers });
 

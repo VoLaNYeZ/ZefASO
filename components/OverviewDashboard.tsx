@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
     DollarSign,
     Smartphone,
@@ -87,7 +87,15 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         toLocalStr(new Date())
     );
     const [selectedCategory, setSelectedCategory] = useState<string>('All');
-    const [overviewMode, setOverviewMode] = useState<OverviewMode>('keyword');
+    const [overviewMode, setOverviewMode] = useState<OverviewMode>(() => {
+        const saved = localStorage.getItem('zeyfaso_overview_mode');
+        return (saved === 'keyword' || saved === 'geo') ? saved : 'keyword';
+    });
+
+    // Save overview mode preference
+    useEffect(() => {
+        localStorage.setItem('zeyfaso_overview_mode', overviewMode);
+    }, [overviewMode]);
 
     const setQuickDate = (type: 'yesterday' | 'today' | 'thisMonth' | 'lastMonth') => {
         const now = new Date();

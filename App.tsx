@@ -64,7 +64,7 @@ import { KeywordSuggester } from './components/KeywordSuggester';
 import { supabase } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
-import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, deleteAsoEntriesForApp } from './lib/supabaseService';
+import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, deleteAsoEntriesForApp, deleteAsoEntriesForAppName } from './lib/supabaseService';
 import { fetchSheetData, processSheetData } from './services/googleSheets';
 
 const App = () => {
@@ -169,63 +169,78 @@ const App = () => {
 
 
 
-    // Save to Supabase whenever data changes (debounced)
-    useEffect(() => {
-        if (!session || dataLoading) return;
-        const timer = setTimeout(() => {
-            saveAsoData(data);
-        }, 1000); // Debounce saves by 1 second
-        return () => clearTimeout(timer);
-    }, [data, session, dataLoading]);
+    // Save to Supabase whenever data changes (debounced, consolidated)
+    const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
     useEffect(() => {
         if (!session || dataLoading) return;
-        const timer = setTimeout(() => {
-            saveAppSettings({
-                appIcons,
-                categories,
-                appCategoryMap,
-                collapsedCategories
-            });
-        }, 1000);
-        return () => clearTimeout(timer);
-    }, [appIcons, categories, appCategoryMap, collapsedCategories, session, dataLoading]);
 
-    useEffect(() => {
-        if (!session || dataLoading) return;
-        const timer = setTimeout(() => {
-            saveUserPreferences({ lang, theme, hiddenApps });
+        // Clear any pending save
+        clearTimeout(saveTimeoutRef.current);
+
+        // Debounce all saves together
+        saveTimeoutRef.current = setTimeout(async () => {
+            try {
+                await Promise.all([
+                    saveAsoData(data),
+                    saveAppSettings({
+                        appIcons,
+                        categories,
+                        appCategoryMap,
+                        collapsedCategories
+                    }),
+                    saveUserPreferences({ lang, theme, hiddenApps })
+                ]);
+            } catch (error) {
+                console.error('Failed to save data:', error);
+            }
         }, 1000);
-        return () => clearTimeout(timer);
-    }, [lang, theme, hiddenApps, session, dataLoading]);
+
+        return () => clearTimeout(saveTimeoutRef.current);
+    }, [data, appIcons, categories, appCategoryMap, collapsedCategories, lang, theme, hiddenApps, session, dataLoading]);
 
     // -- Cross-Tab Synchronization --
-    useEffect(() => {
-        const channel = new BroadcastChannel('zeyfaso_sync');
+    const isRemoteUpdate = useRef(false);
+    const broadcastChannel = useRef<BroadcastChannel | null>(null);
 
-        channel.onmessage = (event) => {
+    // Initialize channel once and handle incoming messages
+    useEffect(() => {
+        broadcastChannel.current = new BroadcastChannel('zeyfaso_sync');
+
+        broadcastChannel.current.onmessage = (event) => {
             if (event.data.type === 'SYNC_UPDATE') {
                 const { payload } = event.data;
-                // Only update if value is different to avoid loops/re-renders
-                if (payload.theme && payload.theme !== theme) setTheme(payload.theme);
-                if (payload.lang && payload.lang !== lang) setLang(payload.lang);
-                if (payload.categories && JSON.stringify(payload.categories) !== JSON.stringify(categories)) setCategories(payload.categories);
-                if (payload.appIcons && JSON.stringify(payload.appIcons) !== JSON.stringify(appIcons)) setAppIcons(payload.appIcons);
-                if (payload.appCategoryMap && JSON.stringify(payload.appCategoryMap) !== JSON.stringify(appCategoryMap)) setAppCategoryMap(payload.appCategoryMap);
-                if (payload.collapsedCategories && JSON.stringify(payload.collapsedCategories) !== JSON.stringify(collapsedCategories)) setCollapsedCategories(payload.collapsedCategories);
-                if (payload.hiddenApps && JSON.stringify(payload.hiddenApps) !== JSON.stringify(hiddenApps)) setHiddenApps(payload.hiddenApps);
+
+                // Mark as remote update to prevent re-broadcasting
+                isRemoteUpdate.current = true;
+
+                // Apply updates
+                if (payload.theme) setTheme(payload.theme);
+                if (payload.lang) setLang(payload.lang);
+                if (payload.categories) setCategories(payload.categories);
+                if (payload.appIcons) setAppIcons(payload.appIcons);
+                if (payload.appCategoryMap) setAppCategoryMap(payload.appCategoryMap);
+                if (payload.collapsedCategories) setCollapsedCategories(payload.collapsedCategories);
+                if (payload.hiddenApps) setHiddenApps(payload.hiddenApps);
+
+                // Reset flag after React processes the updates
+                requestAnimationFrame(() => {
+                    isRemoteUpdate.current = false;
+                });
             }
         };
 
         return () => {
-            channel.close();
+            broadcastChannel.current?.close();
         };
-    }, [theme, lang, categories, appIcons, appCategoryMap, collapsedCategories, hiddenApps]);
+    }, []); // Empty deps - only run once
 
-    // Broadcast changes
+    // Broadcast local changes to other tabs
     useEffect(() => {
-        const channel = new BroadcastChannel('zeyfaso_sync');
-        channel.postMessage({
+        // Skip if this change came from another tab
+        if (isRemoteUpdate.current || !broadcastChannel.current) return;
+
+        broadcastChannel.current.postMessage({
             type: 'SYNC_UPDATE',
             payload: {
                 theme,
@@ -237,7 +252,6 @@ const App = () => {
                 hiddenApps
             }
         });
-        return () => channel.close();
     }, [theme, lang, categories, appIcons, appCategoryMap, collapsedCategories, hiddenApps]);
 
     // Theme Effects
@@ -801,10 +815,18 @@ const App = () => {
         setDeleteAllConfirmation(true);
     };
 
-    const confirmDeleteAllApps = () => {
+    const confirmDeleteAllApps = async () => {
         if (!filters.appName) return;
 
         const appNameToDelete = filters.appName;
+
+        try {
+            // Delete from Supabase first
+            await deleteAsoEntriesForAppName(appNameToDelete);
+        } catch (error) {
+            console.error('Failed to delete from database:', error);
+            // Continue with local cleanup even if DB delete fails
+        }
 
         // Wipe ALL data for this specific app name (regardless of ID)
         setData(prev => prev.filter(d => d.appName !== appNameToDelete));
@@ -1925,10 +1947,15 @@ const App = () => {
                                 <AlertTriangle size={32} />
                             </div>
                             <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Delete All {filters.appName} Data?</h3>
-                            <p className="text-slate-600 dark:text-slate-400 mb-6">
+                            <p className="text-slate-600 dark:text-slate-400 mb-4">
                                 Are you sure you want to delete <strong className="text-red-600 dark:text-red-400">ALL DATA</strong> for <span className="font-bold">{filters.appName}</span>?<br />
                                 <span className="font-bold text-red-600 dark:text-red-400">This will remove all versions and IDs for this app.</span>
                             </p>
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-6 text-left">
+                                <p className="text-xs text-amber-700 dark:text-amber-300">
+                                    <strong>⚠️ Note:</strong> If this app is synced from Google Sheets, you'll also need to remove it from your spreadsheet to prevent it from reappearing on the next sync.
+                                </p>
+                            </div>
                             <div className="flex gap-3 justify-center">
                                 <button
                                     onClick={() => setDeleteAllConfirmation(false)}

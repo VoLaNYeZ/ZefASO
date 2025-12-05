@@ -148,6 +148,14 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
 
   // Layout Configuration
   const isMini = viewMode === 'mini';
+
+  // Slice data for Mini View (show last 14 points to prevent overcrowding)
+  const displayedData = useMemo(() => {
+    if (isMini && chartData.length > 14) {
+      return chartData.slice(-14);
+    }
+    return chartData;
+  }, [chartData, isMini]);
   const containerClass = isMini
     ? "grid grid-cols-1 lg:grid-cols-3 gap-4 pb-4"
     : "space-y-8 pb-10";
@@ -163,7 +171,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
         <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">{granularity} Installs</h3>
         <div className={`${chartHeightClass} w-full min-w-0`}>
           <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-            <AreaChart data={chartData}>
+            <AreaChart data={displayedData}>
               <defs>
                 <linearGradient id="colorInstalls" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
@@ -210,7 +218,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
         <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">{translations?.avgAppStoreRanking || 'Avg. App Store Ranking'}</h3>
         <div className={`${chartHeightClass} w-full min-w-0`}>
           <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-            <LineChart data={chartData}>
+            <LineChart data={displayedData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
               <XAxis
                 dataKey="date"
@@ -311,7 +319,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
 
         <div className={`${chartHeightClass} w-full min-w-0`}>
           <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-            <BarChart data={chartData}>
+            <BarChart data={displayedData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
               <XAxis
                 dataKey="date"

@@ -120,6 +120,22 @@ export const deleteAsoEntriesForApp = async (appId: string): Promise<void> => {
     }
 };
 
+// Delete all ASO entries for a specific app by NAME (for "Delete All" action)
+export const deleteAsoEntriesForAppName = async (appName: string): Promise<void> => {
+    const userId = await getUserId();
+
+    const { error } = await supabase
+        .from('aso_entries')
+        .delete()
+        .eq('user_id', userId)
+        .eq('app_name', appName);
+
+    if (error) {
+        console.error('Error deleting app entries by name:', error);
+        throw error;
+    }
+};
+
 // Delete all ASO entries for user (for explicit "delete all" action)
 export const deleteAllAsoEntries = async (): Promise<void> => {
     const userId = await getUserId();

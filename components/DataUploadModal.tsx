@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload, Plus, FileText, CheckCircle, Smartphone, FolderPlus, Layers, Table, RefreshCw } from 'lucide-react';
 import { fetchSheetTabs, fetchSheetData, processSheetData } from '../services/googleSheets';
 import { supabase } from '../lib/supabase';
-import { AsoEntry } from '../types';
+import { AsoEntry, Translations } from '../types';
 import { DEFAULT_CPI } from '../constants';
 
 interface DataUploadModalProps {
@@ -13,7 +13,7 @@ interface DataUploadModalProps {
     activeApps: string[];
     existingDataKeys: Set<string>;
     theme: 'light' | 'dark';
-    t: any;
+    t: Translations;
 }
 
 type ImportStrategy = 'existing' | 'new' | 'bulk' | 'sheets';
@@ -555,7 +555,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col border border-slate-200 dark:border-slate-800">
                 <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800 shrink-0">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{t.addAsoData}</h2>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{t.addData}</h2>
                     <button onClick={() => { onClose(); resetForm(); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
                         <X size={20} className="text-slate-500 dark:text-slate-400" />
                     </button>

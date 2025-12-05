@@ -245,7 +245,7 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {uniqueGeos.map(geo => (
-                    <div key={geo} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                    <div key={geo} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                         {/* Header */}
                         <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
                             <img src={getCountryFlag(geo)} alt={geo} className="w-5 h-4 object-cover rounded-sm" />
@@ -271,7 +271,7 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
                                         T{countryRankings[normalizeCountryCode(geo)].label}
                                     </span>
                                     {hoveredCountry === geo && (
-                                        <div className="absolute top-full left-0 mt-2 bg-slate-900 dark:bg-slate-800 text-white px-3 py-2 rounded-lg shadow-xl z-50 min-w-[200px] border border-slate-700 dark:border-slate-600">
+                                        <div className="absolute bottom-full left-0 mb-2 bg-slate-900 dark:bg-slate-800 text-white px-3 py-2 rounded-lg shadow-xl z-50 min-w-[200px] border border-slate-700 dark:border-slate-600">
                                             <div className="text-[11px] font-bold mb-1.5">{countryRankings[normalizeCountryCode(geo)].name || geo}</div>
                                             {countryRankings[normalizeCountryCode(geo)].population && (
                                                 <div className="text-xs mb-1">

@@ -1,6 +1,10 @@
 {
     "rewrites": [
         {
+            "source": "/asomobile-api/:path*",
+            "destination": "https://app.asomobile.net/asomobile-public-api/:path*"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }

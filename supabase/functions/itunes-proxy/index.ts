@@ -54,6 +54,22 @@ serve(async (req) => {
             },
         });
 
+        // Handle rate limiting with Retry-After
+        if (response.status === 429) {
+            const retryAfter = response.headers.get('Retry-After') || '60';
+            return new Response(
+                JSON.stringify({ error: 'Rate limited by iTunes API', retryAfter: parseInt(retryAfter) }),
+                {
+                    status: 429,
+                    headers: {
+                        ...corsHeaders(origin),
+                        'Content-Type': 'application/json',
+                        'Retry-After': retryAfter
+                    }
+                }
+            );
+        }
+
         if (!response.ok) {
             return new Response(
                 JSON.stringify({ error: `iTunes API error: ${response.status} ${response.statusText}` }),

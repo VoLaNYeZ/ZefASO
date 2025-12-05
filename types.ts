@@ -56,3 +56,8 @@ export interface ComparisonBlock {
   startDate: string | null;
   endDate: string | null;
 }
+
+// Translation type - derived from i18n.ts structure
+import { translations } from './i18n';
+export type Translations = typeof translations.en;
+
