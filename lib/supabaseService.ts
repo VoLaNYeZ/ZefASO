@@ -169,8 +169,10 @@ export const loadAppSettings = async (): Promise<AppSettings> => {
         .eq('user_id', userId)
         .single();
 
-    if (error || !data) {
-        // Return defaults if no settings exist
+    if (error) throw error;
+
+    if (!data) {
+        // Return defaults if no settings exist (New User)
         return {
             appIcons: {},
             categories: ['General'],
@@ -225,7 +227,9 @@ export const loadUserPreferences = async (): Promise<UserPreferences> => {
         .eq('user_id', userId)
         .single();
 
-    if (error || !data) {
+    if (error) throw error;
+
+    if (!data) {
         return {
             lang: 'en',
             theme: 'light',

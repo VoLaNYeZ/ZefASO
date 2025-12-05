@@ -102,6 +102,13 @@ const App = () => {
     const [isSyncing, setIsSyncing] = useState(false);
     const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
     const [showSyncSuccess, setShowSyncSuccess] = useState(false);
+    const [loadFailed, setLoadFailed] = useState(false);
+
+    // Ref to track appIcons for background fetcher to avoid stale closures
+    const appIconsRef = useRef(appIcons);
+    useEffect(() => {
+        appIconsRef.current = appIcons;
+    }, [appIcons]);
 
     // Track if we've already loaded data to prevent reloading on tab switch
     const hasLoadedData = useRef(false);
@@ -169,6 +176,7 @@ const App = () => {
                 currentUserId.current = userId;
             } catch (error) {
                 console.error('Error loading data from Supabase:', error);
+                setLoadFailed(true);
                 // On error, show empty state instead of potentially confusing demo data
                 setData([]);
             } finally {
@@ -185,7 +193,7 @@ const App = () => {
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
     useEffect(() => {
-        if (!session || dataLoading) return;
+        if (!session || dataLoading || loadFailed) return;
 
         // Clear any pending save
         clearTimeout(saveTimeoutRef.current);
@@ -209,7 +217,7 @@ const App = () => {
         }, 1000);
 
         return () => clearTimeout(saveTimeoutRef.current);
-    }, [data, appIcons, categories, appCategoryMap, collapsedCategories, lang, theme, hiddenApps, session, dataLoading]);
+    }, [data, appIcons, categories, appCategoryMap, collapsedCategories, lang, theme, hiddenApps, session, dataLoading, loadFailed]);
 
     // -- Cross-Tab Synchronization --
     const isRemoteUpdate = useRef(false);
@@ -559,7 +567,7 @@ const App = () => {
             // 2. Do not have an icon yet
             // 3. Have not been attempted in this session (to avoid infinite retries on failures)
             const appsNeedingIcons = activeApps.filter(appName =>
-                !appIcons[appName] && !attemptedBackgroundFetches.current.has(appName)
+                !appIconsRef.current[appName] && !attemptedBackgroundFetches.current.has(appName)
             );
 
             if (appsNeedingIcons.length === 0) return;
