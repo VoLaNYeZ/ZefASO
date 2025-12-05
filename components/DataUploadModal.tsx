@@ -491,8 +491,18 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
             let skippedCount = 0;
             const foundDates = new Set<string>();
 
-            for (const tab of selectedTabs) {
+            // Parallelize fetching data from all selected tabs
+            const fetchPromises = Array.from(selectedTabs).map(async (tab: string) => {
+                // Fetch data for this tab
                 const data = await fetchSheetData(webAppUrl, tab);
+                return { tab, data } as { tab: string; data: any[][] };
+            });
+
+            // Wait for all requests to complete
+            const results = await Promise.all(fetchPromises);
+
+            // Process the results
+            for (const { tab, data } of results) {
                 const entries = processSheetData(data, tab);
 
                 entries.forEach(entry => {
