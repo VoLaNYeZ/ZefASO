@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import DOMPurify from 'dompurify';
 import {
     LayoutDashboard,
     BarChart2,
@@ -197,6 +198,47 @@ const App = () => {
         }, 1000);
         return () => clearTimeout(timer);
     }, [lang, theme, hiddenApps, session, dataLoading]);
+
+    // -- Cross-Tab Synchronization --
+    useEffect(() => {
+        const channel = new BroadcastChannel('zeyfaso_sync');
+
+        channel.onmessage = (event) => {
+            if (event.data.type === 'SYNC_UPDATE') {
+                const { payload } = event.data;
+                // Only update if value is different to avoid loops/re-renders
+                if (payload.theme && payload.theme !== theme) setTheme(payload.theme);
+                if (payload.lang && payload.lang !== lang) setLang(payload.lang);
+                if (payload.categories && JSON.stringify(payload.categories) !== JSON.stringify(categories)) setCategories(payload.categories);
+                if (payload.appIcons && JSON.stringify(payload.appIcons) !== JSON.stringify(appIcons)) setAppIcons(payload.appIcons);
+                if (payload.appCategoryMap && JSON.stringify(payload.appCategoryMap) !== JSON.stringify(appCategoryMap)) setAppCategoryMap(payload.appCategoryMap);
+                if (payload.collapsedCategories && JSON.stringify(payload.collapsedCategories) !== JSON.stringify(collapsedCategories)) setCollapsedCategories(payload.collapsedCategories);
+                if (payload.hiddenApps && JSON.stringify(payload.hiddenApps) !== JSON.stringify(hiddenApps)) setHiddenApps(payload.hiddenApps);
+            }
+        };
+
+        return () => {
+            channel.close();
+        };
+    }, [theme, lang, categories, appIcons, appCategoryMap, collapsedCategories, hiddenApps]);
+
+    // Broadcast changes
+    useEffect(() => {
+        const channel = new BroadcastChannel('zeyfaso_sync');
+        channel.postMessage({
+            type: 'SYNC_UPDATE',
+            payload: {
+                theme,
+                lang,
+                categories,
+                appIcons,
+                appCategoryMap,
+                collapsedCategories,
+                hiddenApps
+            }
+        });
+        return () => channel.close();
+    }, [theme, lang, categories, appIcons, appCategoryMap, collapsedCategories, hiddenApps]);
 
     // Theme Effects
     useEffect(() => {
@@ -423,6 +465,8 @@ const App = () => {
 
     // -- Fetch App Icon Effect --
     useEffect(() => {
+        let isMounted = true;
+
         const fetchIcon = async () => {
             // Skip if no app selected or no ID found
             if (!filters.appName || !currentNumericId) return;
@@ -441,6 +485,7 @@ const App = () => {
 
             // 2. Iterate and try to fetch
             for (const country of Array.from(countriesToTry)) {
+                if (!isMounted) return;
                 try {
                     // iTunes Lookup API
                     const targetUrl = `https://itunes.apple.com/lookup?id=${currentNumericId}&country=${country}`;
@@ -450,12 +495,14 @@ const App = () => {
                         body: { url: targetUrl }
                     });
 
+                    if (!isMounted) return;
+
                     if (!error && itunesData && itunesData.resultCount > 0) {
                         const result = itunesData.results[0];
                         const iconUrl = result.artworkUrl512 || result.artworkUrl100 || result.artworkUrl60;
 
                         // Only update if the icon is different to avoid loops/unnecessary saves
-                        if (iconUrl && iconUrl !== appIcons[filters.appName]) {
+                        if (isMounted && iconUrl && iconUrl !== appIcons[filters.appName]) {
                             setAppIcons(prev => ({ ...prev, [filters.appName!]: iconUrl }));
                         }
                         return; // Stop once found
@@ -467,6 +514,10 @@ const App = () => {
         };
 
         fetchIcon();
+
+        return () => {
+            isMounted = false;
+        };
     }, [filters.appName, currentNumericId, availableGeos, appIcons]);
 
 
@@ -1722,10 +1773,13 @@ const App = () => {
                                         ) : (
                                             <div className="prose prose-slate dark:prose-invert max-w-none">
                                                 <div dangerouslySetInnerHTML={{
-                                                    __html: aiAnalysis
-                                                        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-800 dark:text-slate-200 font-bold">$1</strong>')
-                                                        .replace(/\* (.*?)\n/g, '<li class="ml-4 list-disc text-slate-700 dark:text-slate-300">$1</li>')
-                                                        .replace(/\n/g, '<br />')
+                                                    __html: DOMPurify.sanitize(
+                                                        aiAnalysis
+                                                            .replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-800 dark:text-slate-200 font-bold">$1</strong>')
+                                                            .replace(/\* (.*?)\n/g, '<li class="ml-4 list-disc text-slate-700 dark:text-slate-300">$1</li>')
+                                                            .replace(/\n/g, '<br />'),
+                                                        { ALLOWED_TAGS: ['strong', 'li', 'br', 'ul', 'p', 'div', 'span'], ALLOWED_ATTR: ['class'] }
+                                                    )
                                                 }} />
                                             </div>
                                         )}

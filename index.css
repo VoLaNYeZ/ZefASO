@@ -154,3 +154,8 @@ body {
 .animation-delay-4000 {
   animation-delay: 4s;
 }
+
+/* Force pointer cursor on all buttons */
+button {
+  cursor: pointer;
+}

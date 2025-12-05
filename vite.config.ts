@@ -1,9 +1,8 @@
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
+export default defineConfig(() => {
   return {
     server: {
       port: 3000,
@@ -18,8 +17,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [react()],
     define: {
-      'process.env.API_KEY': JSON.stringify(env.OPENAI_API_KEY),
-      'process.env.OPENAI_API_KEY': JSON.stringify(env.OPENAI_API_KEY)
+      // API keys removed - now handled securely via Supabase Edge Functions
     },
     resolve: {
       alias: {
@@ -28,18 +26,17 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       minify: 'terser',
-      chunkSizeWarningLimit: 1000, // Increase limit to 1000 kB (from default 500 kB)
+      chunkSizeWarningLimit: 1000,
       terserOptions: {
         format: {
-          comments: false, // Remove all comments
+          comments: false,
         },
         compress: {
-          drop_console: false, // Keep console logs (set to true to remove them)
+          drop_console: false,
           drop_debugger: true,
-          pure_funcs: ['console.log'], // Optional: remove console.log calls
+          pure_funcs: ['console.log'],
         }
       },
-      // Use Vite's default chunk splitting to avoid circular dependencies between manual vendor bundles
       rollupOptions: {
         output: {
           banner: ''

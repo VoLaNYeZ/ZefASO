@@ -3,27 +3,45 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
+// Issue 1.2 FIX: Restricted CORS to specific origins instead of wildcard
+const ALLOWED_ORIGINS = [
+    'https://zefaso.tech',
+    'https://www.zefaso.tech',
+    'http://localhost:3000',
+    'http://localhost:5173'
+];
+
+const corsHeaders = (origin: string | null) => ({
+    'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin || '') ? origin! : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+});
 
 serve(async (req) => {
+    const origin = req.headers.get('origin');
+
     // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders });
+        return new Response('ok', { headers: corsHeaders(origin) });
     }
 
     try {
         const { url } = await req.json();
 
-        if (!url || !url.includes('itunes.apple.com')) {
+        // Issue 1.4 FIX: Strict URL validation using URL parser instead of .includes()
+        let parsedUrl: URL;
+        try {
+            parsedUrl = new URL(url);
+        } catch {
             return new Response(
-                JSON.stringify({ error: 'Invalid iTunes URL' }),
-                {
-                    status: 400,
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                }
+                JSON.stringify({ error: 'Invalid URL format' }),
+                { status: 400, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' } }
+            );
+        }
+
+        if (parsedUrl.hostname !== 'itunes.apple.com') {
+            return new Response(
+                JSON.stringify({ error: 'Only itunes.apple.com URLs are allowed' }),
+                { status: 400, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' } }
             );
         }
 
@@ -37,13 +55,9 @@ serve(async (req) => {
         });
 
         if (!response.ok) {
-            // Return the upstream error directly so client knows what happened
             return new Response(
                 JSON.stringify({ error: `iTunes API error: ${response.status} ${response.statusText}` }),
-                {
-                    status: response.status,
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                }
+                { status: response.status, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' } }
             );
         }
 
@@ -53,22 +67,16 @@ serve(async (req) => {
 
         return new Response(
             JSON.stringify(data),
-            {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            }
+            { headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' } }
         );
 
     } catch (error) {
+        const origin = req.headers.get('origin');
         console.error('[iTunes Proxy] Error:', error);
 
         return new Response(
-            JSON.stringify({
-                error: error.message || 'Failed to fetch from iTunes API'
-            }),
-            {
-                status: 500,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            }
+            JSON.stringify({ error: error.message || 'Failed to fetch from iTunes API' }),
+            { status: 500, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' } }
         );
     }
 });

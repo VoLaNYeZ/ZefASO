@@ -1,7 +1,21 @@
 import { AsoEntry } from '../types';
 import { DEFAULT_CPI } from '../constants';
 
+// Issue 1.3 FIX: Validate that URL is a legitimate Google Apps Script URL
+const validateGoogleScriptUrl = (url: string): void => {
+    try {
+        const parsed = new URL(url);
+        if (parsed.hostname !== 'script.google.com' ||
+            !parsed.pathname.startsWith('/macros/s/')) {
+            throw new Error('Invalid Google Apps Script URL');
+        }
+    } catch (e) {
+        throw new Error('Invalid URL. Must be a Google Apps Script URL (https://script.google.com/macros/s/...)');
+    }
+};
+
 export const fetchSheetTabs = async (webAppUrl: string): Promise<string[]> => {
+    validateGoogleScriptUrl(webAppUrl);
     const url = `${webAppUrl}?action=getTabs`;
     const response = await fetch(url);
 
@@ -18,6 +32,7 @@ export const fetchSheetTabs = async (webAppUrl: string): Promise<string[]> => {
 };
 
 export const fetchSheetData = async (webAppUrl: string, tabName: string): Promise<any[][]> => {
+    validateGoogleScriptUrl(webAppUrl);
     const url = `${webAppUrl}?action=getData&tab=${encodeURIComponent(tabName)}`;
     const response = await fetch(url);
 
