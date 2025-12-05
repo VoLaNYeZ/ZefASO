@@ -8,7 +8,7 @@ export const translations = {
         empty: 'Empty',
         uncategorized: 'Uncategorized',
         hiddenArchived: 'Hidden / Archived',
-        addNewData: 'Add New Data',
+        addNewData: 'New Data',
         dashboard: 'Dashboard',
         store: 'Store',
         settings: 'Settings',
@@ -175,9 +175,9 @@ export const translations = {
         clickToCopy: 'Click to copy',
         keywordSuggesterError: 'Failed to generate keywords. Please try again later.',
 
-        // Top 5 Feature
-        viewTop5: 'View Top 5',
-        top5Apps: 'Top 5 Apps',
+        // Top 20 Feature
+        viewTop5: 'View Top 20',
+        top5Apps: 'Top 20 Apps',
         inGeo: 'in',
         rating: 'Rating',
         screenshots: 'Screenshots'
@@ -358,9 +358,9 @@ export const translations = {
         clickToCopy: 'Нажмите для копирования',
         keywordSuggesterError: 'Не удалось сгенерировать ключи. Попробуйте позже.',
 
-        // Top 5 Feature
-        viewTop5: 'Топ 5',
-        top5Apps: 'Топ 5 приложений',
+        // Top 20 Feature
+        viewTop5: 'Top 20',
+        top5Apps: 'Top 20 приложений',
         inGeo: 'в',
         rating: 'Рейтинг',
         screenshots: 'Скриншоты'

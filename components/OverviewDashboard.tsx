@@ -520,6 +520,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                     <img
                                         src={appIcons[app.appName]}
                                         alt={app.appName}
+                                        loading="eager"
                                         className="w-14 h-14 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm object-cover bg-white"
                                     />
                                 ) : (
@@ -557,6 +558,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                                     <img
                                                         src={getCountryFlag(geo)}
                                                         alt={geo}
+                                                        loading="eager"
                                                         className="w-5 h-3.5 object-contain shadow-sm rounded-[2px]"
                                                         onError={(e) => {
                                                             (e.target as HTMLImageElement).style.display = 'none';
@@ -595,7 +597,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                         >
                                             <div className="flex justify-between items-center mb-2">
                                                 <div className="flex items-center gap-2">
-                                                    {group.flag && <img src={group.flag} alt="flag" className="w-5 h-3.5 object-contain shadow-sm" />}
+                                                    {group.flag && <img src={group.flag} alt="flag" loading="eager" className="w-5 h-3.5 object-contain shadow-sm" />}
                                                     <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{group.title}</span>
                                                 </div>
                                                 <span className="text-[10px] font-semibold bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded">
@@ -610,7 +612,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                                         className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg pl-2 pr-1.5 py-1.5 shadow-sm hover:border-indigo-100 dark:hover:border-indigo-900 transition-colors"
                                                     >
                                                         {/* Flag if in Keyword View */}
-                                                        {item.flag && <img src={item.flag} alt={item.label} className="w-4 h-3 object-contain shadow-sm" title={item.label} />}
+                                                        {item.flag && <img src={item.flag} alt={item.label} loading="eager" className="w-4 h-3 object-contain shadow-sm" title={item.label} />}
 
                                                         {/* Label (Geo or Keyword) */}
                                                         {!item.flag && <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{item.label}</span>}

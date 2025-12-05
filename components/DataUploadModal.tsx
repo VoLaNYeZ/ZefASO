@@ -14,12 +14,13 @@ interface DataUploadModalProps {
     existingDataKeys: Set<string>;
     theme: 'light' | 'dark';
     t: Translations;
+    onSyncStatusChange?: (isActive: boolean) => void;
 }
 
 type ImportStrategy = 'existing' | 'new' | 'bulk' | 'sheets';
 type InputMethod = 'paste' | 'file' | 'manual';
 
-export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClose, onAddData, selectedApp, activeApps, existingDataKeys, theme, t }) => {
+export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClose, onAddData, selectedApp, activeApps, existingDataKeys, theme, t, onSyncStatusChange }) => {
     // Strategy State
     const [strategy, setStrategy] = useState<ImportStrategy>('existing');
 
@@ -108,6 +109,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
             setSheetTabs([]);
             setSelectedTabs(new Set());
             setIsSyncEnabled(false);
+            if (onSyncStatusChange) onSyncStatusChange(false);
         } else {
             alert("Failed to disconnect.");
         }
@@ -547,6 +549,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                         } else {
                             console.log("Sync settings saved successfully.");
                             setLastSyncedAt(now); // Update local state
+                            if (onSyncStatusChange) onSyncStatusChange(true);
                         }
                     }
                 }
@@ -724,11 +727,6 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                                     <CheckCircle className="text-emerald-600 dark:text-emerald-400" size={20} />
                                                     <h3 className="font-bold text-emerald-800 dark:text-emerald-300">Sync Active</h3>
                                                 </div>
-                                                {lastSyncedAt && (
-                                                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                                                        Last sync: {new Date(lastSyncedAt).toLocaleDateString('en-GB')} {new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </span>
-                                                )}
                                             </div>
 
                                             <div className="space-y-3">
@@ -800,7 +798,22 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                                     >
                                                         Disconnect
                                                     </button>
+                                                    <button
+                                                        onClick={handleDisconnect}
+                                                        disabled={isImportingSheet}
+                                                        className="px-4 py-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm disabled:opacity-50"
+                                                    >
+                                                        Disconnect
+                                                    </button>
                                                 </div>
+
+                                                {lastSyncedAt && (
+                                                    <div className="text-center pt-2">
+                                                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium bg-white/50 dark:bg-black/20 px-2 py-0.5 rounded-full inline-block">
+                                                            Last synced: {new Date(lastSyncedAt).toLocaleDateString('en-GB')} {new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ) : (

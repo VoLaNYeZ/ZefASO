@@ -63,7 +63,7 @@ const Top5Modal: React.FC<Top5ModalProps> = ({
                     <div className="flex items-center gap-3">
                         <img src={getCountryFlag(geo)} alt={geo} className="w-6 h-5 object-cover rounded-sm shadow-sm" />
                         <div>
-                            <h2 className="text-xl font-bold text-white">{translations?.top5Apps || 'Top 5 Apps'}</h2>
+                            <h2 className="text-xl font-bold text-white">{translations?.top5Apps || 'Top 20 Apps'}</h2>
                             <p className="text-sm text-indigo-100">"{keyword}" {translations?.inGeo || 'in'} {geo}</p>
                         </div>
                     </div>
@@ -98,13 +98,15 @@ const Top5Modal: React.FC<Top5ModalProps> = ({
                     {!isLoading && !error && apps.length > 0 && (
                         <div className="grid grid-cols-1 gap-4">
                             {apps.map((app) => (
+
                                 <div
                                     key={app.trackId}
-                                    className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-4 hover:shadow-lg transition-all"
+                                    className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-3 hover:shadow-lg transition-all flex items-center gap-4"
                                 >
-                                    <div className="flex gap-4">
+                                    {/* Left Side: Rank, Icon, Info */}
+                                    <div className="flex items-center gap-4 flex-1 min-w-0">
                                         {/* Rank Badge */}
-                                        <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg ${getRankBadgeClass(app.rank)}`}>
+                                        <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg shadow-sm ${getRankBadgeClass(app.rank)}`}>
                                             #{app.rank}
                                         </div>
 
@@ -118,7 +120,7 @@ const Top5Modal: React.FC<Top5ModalProps> = ({
                                             <img
                                                 src={app.artworkUrl100}
                                                 alt={app.trackName}
-                                                className="w-16 h-16 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm object-cover hover:opacity-80 transition-opacity cursor-pointer"
+                                                className="w-14 h-14 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm object-cover hover:opacity-80 transition-opacity cursor-pointer"
                                             />
                                         </a>
 
@@ -128,55 +130,57 @@ const Top5Modal: React.FC<Top5ModalProps> = ({
                                                 href={app.trackViewUrl}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="block font-bold text-slate-800 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 truncate text-lg transition-colors cursor-pointer"
+                                                className="block font-bold text-slate-800 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 truncate text-base transition-colors cursor-pointer"
                                             >
                                                 {app.trackName}
                                             </a>
-                                            <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-1">
                                                 {app.sellerName}
                                             </p>
-                                            <div className="flex items-center gap-4 mt-2">
+
+                                            <div className="flex items-center gap-3">
                                                 {/* Rating */}
-                                                <div className="flex items-center gap-1.5">
-                                                    <Star size={14} className="text-yellow-400 fill-yellow-400" />
-                                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                <div className="flex items-center gap-1">
+                                                    <Star size={12} className="text-yellow-400 fill-yellow-400" />
+                                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
                                                         {app.averageUserRating ? app.averageUserRating.toFixed(1) : 'N/A'}
                                                     </span>
                                                 </div>
-                                                {/* Rating Count */}
-                                                <div className="flex items-center gap-1.5">
-                                                    <Users size={14} className="text-slate-400" />
-                                                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                                                        {app.userRatingCount ? app.userRatingCount.toLocaleString() : '0'}
-                                                    </span>
-                                                </div>
+                                                {/* Genres */}
+                                                {app.genres.length > 0 && (
+                                                    <div className="flex gap-1">
+                                                        {app.genres.slice(0, 1).map((genre, idx) => (
+                                                            <span
+                                                                key={idx}
+                                                                className="text-[10px] px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded"
+                                                            >
+                                                                {genre}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
-                                            {/* Genres */}
-                                            {app.genres.length > 0 && (
-                                                <div className="flex gap-1.5 mt-2 flex-wrap">
-                                                    {app.genres.slice(0, 2).map((genre, idx) => (
-                                                        <span
-                                                            key={idx}
-                                                            className="text-xs px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-md"
-                                                        >
-                                                            {genre}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
 
-                                    {/* Screenshot Thumbnails */}
+                                    {/* Right Side: Usage / Screenshots */}
                                     {app.screenshotUrls.length > 0 && (
-                                        <div className="mt-3 flex gap-2">
+                                        <div className="flex gap-2 flex-shrink-0">
                                             {app.screenshotUrls.slice(0, 3).map((url, idx) => (
-                                                <img
+                                                <a
                                                     key={idx}
-                                                    src={url}
-                                                    alt={`Screenshot ${idx + 1}`}
-                                                    className="w-16 h-16 rounded-lg border border-slate-200 dark:border-slate-700 object-cover object-top shadow-sm"
-                                                />
+                                                    href={url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="block hover:opacity-90 transition-opacity"
+                                                    title="View full screenshot"
+                                                >
+                                                    <img
+                                                        src={url}
+                                                        alt={`Screenshot ${idx + 1}`}
+                                                        className="h-20 w-auto rounded-lg border border-slate-200 dark:border-slate-700 object-cover shadow-sm"
+                                                    />
+                                                </a>
                                             ))}
                                         </div>
                                     )}

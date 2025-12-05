@@ -65,6 +65,7 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
             'SW': 'SE',  // Sweden
             'NE': 'NL',  // Netherlands
             'NO': 'NO',  // Norway (already standard)
+            'PL': 'PO',
         };
         return mapping[geo.toUpperCase()] || geo.toUpperCase();
     };
@@ -394,7 +395,7 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
                                                 onClick={() => handleViewTop5(keyword, geo)}
                                                 disabled={isGlobalLoading}
                                                 className="p-1.5 text-slate-400 hover:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-md transition-colors disabled:opacity-50"
-                                                title={translations?.viewTop5 || 'View Top 5'}
+                                                title={translations?.viewTop5 || 'View Top 20'}
                                             >
                                                 <Eye size={14} />
                                             </button>

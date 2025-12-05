@@ -164,8 +164,8 @@ export const fetchTop5Apps = async (term: string, country: string): Promise<Top5
 
     if (data.resultCount === 0) return [];
 
-    // Take first 5 results and map to Top5App interface
-    const top5 = data.results.slice(0, 5).map((app: any, index: number) => ({
+    // Take first 20 results and map to Top5App interface
+    const top5 = data.results.slice(0, 20).map((app: any, index: number) => ({
         rank: index + 1,
         trackId: app.trackId,
         trackName: app.trackName || 'Unknown App',

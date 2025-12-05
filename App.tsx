@@ -98,6 +98,10 @@ const App = () => {
     const [appCategoryMap, setAppCategoryMap] = useState<Record<string, string>>({});
     const [lang, setLang] = useState<'en' | 'ru'>('en');
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
+    const [isSyncConfigured, setIsSyncConfigured] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+    const [showSyncSuccess, setShowSyncSuccess] = useState(false);
 
     // Track if we've already loaded data to prevent reloading on tab switch
     const hasLoadedData = useRef(false);
@@ -122,13 +126,19 @@ const App = () => {
         const loadInitialData = async () => {
             setDataLoading(true);
             try {
-                const [asoData, appSettings, userPrefs, hasSyncConfig, isExistingUser] = await Promise.all([
+                const [asoData, appSettings, userPrefs, hasSyncConfig, isExistingUser, syncResult] = await Promise.all([
                     loadAsoData(),
                     loadAppSettings(),
                     loadUserPreferences(),
                     checkGoogleSheetsSyncExists(),
-                    checkIsExistingUser()
+                    checkIsExistingUser(),
+                    supabase.from('google_sheets_sync').select('last_synced_at').eq('user_id', userId).maybeSingle()
                 ]);
+
+                // Update sync state
+                if (syncResult.data) {
+                    setLastSyncedAt(syncResult.data.last_synced_at);
+                }
 
                 // Only show INITIAL_DATA if this is a brand new user:
                 // 1. No data loaded AND
@@ -151,7 +161,9 @@ const App = () => {
                 setCollapsedCategories(appSettings.collapsedCategories);
                 setHiddenApps(userPrefs.hiddenApps);
                 setLang(userPrefs.lang);
+                setLang(userPrefs.lang);
                 setTheme(userPrefs.theme);
+                setIsSyncConfigured(hasSyncConfig);
 
                 hasLoadedData.current = true;
                 currentUserId.current = userId;
@@ -534,6 +546,106 @@ const App = () => {
         };
     }, [filters.appName, currentNumericId, availableGeos, appIcons]);
 
+    // -- Background Icon Fetcher for ALL Active Apps --
+    // This runs automatically to ensure we have icons for apps even before they are selected
+    const attemptedBackgroundFetches = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const runBackgroundFetch = async () => {
+            // Identify apps that:
+            // 1. Are active (visible in sidebar)
+            // 2. Do not have an icon yet
+            // 3. Have not been attempted in this session (to avoid infinite retries on failures)
+            const appsNeedingIcons = activeApps.filter(appName =>
+                !appIcons[appName] && !attemptedBackgroundFetches.current.has(appName)
+            );
+
+            if (appsNeedingIcons.length === 0) return;
+
+            console.log(`[IconFetcher] Found ${appsNeedingIcons.length} apps needing icons. Starting background fetch...`);
+
+            // Process one by one to be gentle on the proxy/API
+            for (const appName of appsNeedingIcons) {
+                if (!isMounted) return;
+
+                // Mark as attempted immediately
+                attemptedBackgroundFetches.current.add(appName);
+
+                // Find the ID for this app
+                const appId = appResolution.nameToId[appName];
+                // Resolve numeric ID from string ID if needed
+                const match = appId ? appId.match(/(\d+)/) : null;
+                const numericId = match ? match[0] : null;
+
+                if (!numericId) {
+                    console.log(`[IconFetcher] Skipping ${appName} - no numeric ID found.`);
+                    continue;
+                }
+
+                try {
+                    // Try US store first (highest probability)
+                    const targetUrl = `https://itunes.apple.com/lookup?id=${numericId}&country=US`;
+
+                    const { data: itunesData, error } = await supabase.functions.invoke('itunes-proxy', {
+                        body: { url: targetUrl }
+                    });
+
+                    if (!isMounted) return;
+
+                    if (!error && itunesData && itunesData.resultCount > 0) {
+                        const result = itunesData.results[0];
+                        const iconUrl = result.artworkUrl512 || result.artworkUrl100 || result.artworkUrl60;
+
+                        if (iconUrl) {
+                            console.log(`[IconFetcher] Found icon for ${appName}`);
+                            setAppIcons(prev => ({ ...prev, [appName]: iconUrl }));
+                        }
+                    } else {
+                        // If US failed, try a fallback from available data for this app
+                        const appGeos = data.filter(d => d.appName === appName).map(d => d.geo);
+                        const uniqueGeos = Array.from(new Set(appGeos)).filter(g => g !== 'US');
+
+                        if (uniqueGeos.length > 0) {
+                            const fallbackGeo = uniqueGeos[0]; // Just try the first one
+                            const fallbackUrl = `https://itunes.apple.com/lookup?id=${numericId}&country=${fallbackGeo}`;
+
+                            const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('itunes-proxy', {
+                                body: { url: fallbackUrl }
+                            });
+
+                            if (!isMounted) return;
+
+                            if (!fallbackError && fallbackData && fallbackData.resultCount > 0) {
+                                const result = fallbackData.results[0];
+                                const iconUrl = result.artworkUrl512 || result.artworkUrl100 || result.artworkUrl60;
+                                if (iconUrl) {
+                                    setAppIcons(prev => ({ ...prev, [appName]: iconUrl }));
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`[IconFetcher] Failed background fetch for ${appName}`, e);
+                }
+
+                // Small delay between requests to be polite
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        };
+
+        // Run with a small delay after mount/updates to let critical UI render first
+        const timer = setTimeout(runBackgroundFetch, 2000);
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timer);
+        };
+    }, [activeApps, appResolution, data]); // Intentionally omitting appIcons to avoid re-running on every update. 
+    // We rely on the initial filter + attempted set.
+
+
 
     const getStoreUrl = (geo: string, id: string) => {
         // Map custom codes to Apple Store ISO codes
@@ -682,6 +794,8 @@ const App = () => {
                 if (error || !syncSettings || !syncSettings.is_sync_enabled) return;
 
                 const lastSynced = syncSettings.last_synced_at ? new Date(syncSettings.last_synced_at) : null;
+                if (syncSettings.last_synced_at) setLastSyncedAt(syncSettings.last_synced_at); // Update state
+
                 const today = new Date();
                 const isSameDay = lastSynced &&
                     lastSynced.getDate() === today.getDate() &&
@@ -710,10 +824,13 @@ const App = () => {
                     handleAddData(newEntries); // Merge into state
 
                     // Update last_synced_at
+                    const now = new Date().toISOString();
                     await supabase
                         .from('google_sheets_sync')
-                        .update({ last_synced_at: new Date().toISOString() })
+                        .update({ last_synced_at: now })
                         .eq('user_id', session.user.id);
+
+                    setLastSyncedAt(now);
 
                     console.log(`Synced ${newEntries.length} entries from Google Sheets.`);
                 }
@@ -727,6 +844,80 @@ const App = () => {
         const timer = setTimeout(runSync, 3000);
         return () => clearTimeout(timer);
     }, [session]);
+
+    const handleManualRefresh = async () => {
+        if (!session || isSyncing) return;
+        setIsSyncing(true);
+        try {
+            const { data: syncSettings, error } = await supabase
+                .from('google_sheets_sync')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .maybeSingle();
+
+            if (error || !syncSettings || !syncSettings.is_sync_enabled) {
+                console.warn('Sync not configured or disabled');
+                setIsSyncConfigured(false);
+                return;
+            }
+
+            console.log("Running manual Google Sheets sync...");
+            const tabs = syncSettings.selected_tabs as string[];
+            if (!tabs || tabs.length === 0) return;
+
+            let newEntries: AsoEntry[] = [];
+            let errorCount = 0;
+
+            for (const tab of tabs) {
+                try {
+                    const sheetData = await fetchSheetData(syncSettings.web_app_url, tab);
+                    const entries = processSheetData(sheetData, tab);
+                    newEntries = [...newEntries, ...entries];
+                } catch (e) {
+                    console.error(`Failed to sync tab ${tab}:`, e);
+                    errorCount++;
+                }
+            }
+
+            if (newEntries.length > 0) {
+                handleAddData(newEntries); // Merge into state
+
+                // Update last_synced_at
+                const now = new Date().toISOString();
+                await supabase
+                    .from('google_sheets_sync')
+                    .update({ last_synced_at: now })
+                    .eq('user_id', session.user.id);
+
+                setLastSyncedAt(now);
+                setShowSyncSuccess(true);
+                setTimeout(() => setShowSyncSuccess(false), 3000);
+
+                console.log(`Synced ${newEntries.length} entries from Google Sheets.`);
+            } else if (errorCount === 0) {
+                // Even if no new entries, update timestamp to show we checked
+                const now = new Date().toISOString();
+                await supabase
+                    .from('google_sheets_sync')
+                    .update({ last_synced_at: now })
+                    .eq('user_id', session.user.id);
+
+                setLastSyncedAt(now);
+                setShowSyncSuccess(true);
+                setTimeout(() => setShowSyncSuccess(false), 3000);
+            }
+
+            if (errorCount > 0 && newEntries.length === 0) {
+                alert("Failed to sync one or more tabs. Please check your connection and sheet settings.");
+            }
+
+        } catch (err) {
+            console.error("Manual sync failed:", err);
+            alert("Sync failed. See console for details.");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     const handleRequestCPIUpdate = () => {
         if (!filters.appName) return;
@@ -1178,7 +1369,7 @@ const App = () => {
                                                 <div className="flex items-center gap-3 overflow-hidden flex-1">
                                                     {/* Icon or Dot */}
                                                     {appIcons[app] ? (
-                                                        <img src={appIcons[app]} alt="" className="w-5 h-5 rounded-md object-cover shrink-0 bg-white" />
+                                                        <img src={appIcons[app]} alt="" loading="eager" className="w-5 h-5 rounded-md object-cover shrink-0 bg-white" />
                                                     ) : (
                                                         <div className={`w-2 h-2 rounded-full shrink-0 ${filters.appName === app && currentPage === 'dashboard' ? 'bg-indigo-500' : 'bg-slate-600'}`} />
                                                     )}
@@ -1263,7 +1454,7 @@ const App = () => {
                                         >
                                             <div className="flex items-center gap-3 overflow-hidden flex-1">
                                                 {appIcons[app] ? (
-                                                    <img src={appIcons[app]} alt="" className="w-5 h-5 rounded-md object-cover shrink-0 bg-white" />
+                                                    <img src={appIcons[app]} alt="" loading="eager" className="w-5 h-5 rounded-md object-cover shrink-0 bg-white" />
                                                 ) : (
                                                     <div className={`w-2 h-2 rounded-full shrink-0 ${filters.appName === app && currentPage === 'dashboard' ? 'bg-indigo-500' : 'bg-slate-600'}`} />
                                                 )}
@@ -1318,7 +1509,7 @@ const App = () => {
                 </div>
 
                 {/* Bottom Actions Area */}
-                <div className="shrink-0 bg-slate-900 border-t border-slate-800 p-4 space-y-4 z-10">
+                <div className="shrink-0 bg-slate-900 border-t border-slate-800 p-2 space-y-1 z-10">
 
                     {/* Hidden / Archived Section */}
                     {archivedAppsList.length > 0 && (
@@ -1382,7 +1573,33 @@ const App = () => {
                             <Plus size={16} className="shrink-0" />
                             <span>{t.addNewData}</span>
                         </button>
+                        {isSyncConfigured && (
+                            <div className="relative">
+                                <button
+                                    onClick={handleManualRefresh}
+                                    disabled={isSyncing}
+                                    className="shrink-0 w-12 min-h-[3rem] flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl border border-slate-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group"
+                                    title="Refresh Google Sheet Data"
+                                >
+                                    <RefreshCw size={20} className={`transition-all duration-700 ${isSyncing ? 'animate-spin text-indigo-500' : 'group-hover:rotate-180'}`} />
+                                </button>
+                                {showSyncSuccess && (
+                                    <div className="absolute top-full right-0 mt-2 px-2 py-1 bg-emerald-500 text-white text-[10px] font-bold rounded shadow-lg whitespace-nowrap animate-in fade-in slide-in-from-top-1 z-20 pointer-events-none">
+                                        Sync Done!
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
+
+                    {/* Last Synced Badge */}
+                    {isSyncConfigured && lastSyncedAt && (
+                        <div className="text-center animate-in fade-in duration-500">
+                            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-500 bg-slate-800/30 px-1 py-0.5 rounded-full border border-slate-800">
+                                Last synced: {new Date(lastSyncedAt).toLocaleDateString('en-GB')} {new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        </div>
+                    )}
 
                     {/* Language & Theme Controls */}
                     <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/50">
@@ -1465,6 +1682,7 @@ const App = () => {
                                                 <img
                                                     src={appIcons[filters.appName]}
                                                     alt={`${filters.appName} icon`}
+                                                    loading="eager"
                                                     className="w-8 h-8 md:w-10 md:h-10 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm object-cover shrink-0"
                                                 />
                                             )}
