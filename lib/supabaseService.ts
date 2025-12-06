@@ -167,9 +167,14 @@ export const loadAppSettings = async (): Promise<AppSettings> => {
         .from('app_settings')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .order('updated_at', { ascending: false, nullsLast: true })
+        .limit(1)
+        .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+        console.error('Error loading app settings:', error);
+        throw error;
+    }
 
     if (!data) {
         // Return defaults if no settings exist (New User)
@@ -233,9 +238,14 @@ export const loadUserPreferences = async (): Promise<UserPreferences> => {
         .from('user_preferences')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .order('updated_at', { ascending: false, nullsLast: true })
+        .limit(1)
+        .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+        console.error('Error loading user preferences:', error);
+        throw error;
+    }
 
     if (!data) {
         return {
