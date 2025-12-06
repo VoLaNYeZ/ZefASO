@@ -123,8 +123,8 @@ export const processSheetData = (rows: any[][], tabName: string): AsoEntry[] => 
             // Check if ID column (index 3) contains only numbers
             const isValidId = /^\d+$/.test(idColumn) && idColumn.length > 0;
 
-            // Check if Keyword column (index 4) contains letters and is not "no data"/"no date"
-            const isValidKeyword = /[a-zA-Z]/.test(keywordColumn) &&
+            // Allow alphanumeric keywords (e.g., "1game"), just ensure non-empty and not "no data/date"
+            const isValidKeyword = keywordColumn.length > 0 &&
                 !keywordColumn.toLowerCase().includes('no data') &&
                 !keywordColumn.toLowerCase().includes('no date');
 
@@ -170,7 +170,7 @@ export const processSheetData = (rows: any[][], tabName: string): AsoEntry[] => 
         const dateRaw = String(row[0]);
         const appName = tabName;
         const geo = normalizeGeoCode(String(row[2]));
-        const csvId = String(row[3]).trim();
+        const csvIdRaw = String(row[3]).trim();
         const keyword = String(row[4]).trim();
         const rankingRaw = String(row[6]).trim();
         const installsRaw = String(row[7]).trim();
@@ -187,12 +187,18 @@ export const processSheetData = (rows: any[][], tabName: string): AsoEntry[] => 
         const installs = parseInt(installsRaw);
 
         if (date && !isNaN(installs)) {
+            const normalizedId = (() => {
+                if (/^\d+$/.test(csvIdRaw)) return csvIdRaw;
+                const cleaned = csvIdRaw.replace(/[^\dA-Za-z_-]/g, '');
+                return cleaned || appName;
+            })();
+
             const entry: AsoEntry = {
                 id: `sheet-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 date: date,
                 appName: appName,
                 geo: geo,
-                appId: `${appName} ${csvId}`,
+                appId: normalizedId,
                 keyword: keyword,
                 ranking: ranking,
                 installs: installs,

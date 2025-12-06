@@ -87,6 +87,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         toLocalStr(new Date())
     );
     const [selectedCategory, setSelectedCategory] = useState<string>('All');
+    const [selectedApp, setSelectedApp] = useState<string>('All');
     const [overviewMode, setOverviewMode] = useState<OverviewMode>(() => {
         const saved = localStorage.getItem('zeyfaso_overview_mode');
         return (saved === 'keyword' || saved === 'geo') ? saved : 'keyword';
@@ -151,6 +152,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 const appCat = appCategoryMap[d.appName] || 'Uncategorized';
                 if (appCat !== selectedCategory) return false;
             }
+            if (selectedApp !== 'All' && d.appName !== selectedApp) return false;
             return true;
         });
 
@@ -272,7 +274,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         // Sort apps by spend (highest first)
         return processed.sort((a, b) => b.totalCost - a.totalCost);
 
-    }, [data, startDate, endDate, selectedCategory, appCategoryMap, overviewMode]);
+    }, [data, startDate, endDate, selectedCategory, selectedApp, appCategoryMap, overviewMode]);
 
 
     // Helper Logic for calculating stats from a set of entries
@@ -313,12 +315,13 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     // -- Grand Totals --
     const grandTotalCost = aggregatedData.reduce((acc, curr) => acc + curr.totalCost, 0);
     const activeAppsCount = aggregatedData.length;
+    const availableApps = useMemo(() => Array.from(new Set(data.map(d => d.appName))).sort(), [data]);
 
     return (
         <div className="p-6 pb-20 pt-16 md:pt-6 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
 
             {/* Header & Controls */}
-            <div className="flex flex-col xl:flex-row gap-6 justify-between items-start xl:items-end">
+            <div className="sticky top-4 z-30 bg-slate-50/70 dark:bg-slate-900/70 backdrop-blur-md rounded-xl p-4 flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-end shadow-sm">
                 <div>
                     <div className="flex items-center gap-3 mb-1">
                         <div className="p-2 bg-gradient-to-br from-fuchsia-500 to-pink-500 rounded-lg">
@@ -330,7 +333,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm w-full xl:w-auto">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <div className="relative group">
                             <select
                                 value={selectedCategory}
@@ -340,6 +343,17 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                 <option value="All">All Categories</option>
                                 <option value="Uncategorized">{t.uncategorized}</option>
                                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        </div>
+                        <div className="relative group">
+                            <select
+                                value={selectedApp}
+                                onChange={(e) => setSelectedApp(e.target.value)}
+                                className="appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm rounded-lg pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                            >
+                                <option value="All">All Apps</option>
+                                {availableApps.map(app => <option key={app} value={app}>{app}</option>)}
                             </select>
                             <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         </div>
