@@ -136,14 +136,6 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
     return val;
   };
 
-  if (chartData.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-400">
-        No data available for the selected filters.
-      </div>
-    );
-  }
-
   const totalCost = chartData.reduce((sum, item) => sum + item.cost, 0);
 
   // Layout Configuration
@@ -162,6 +154,14 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
 
   const chartContainerClass = `bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm ${isMini ? 'h-full' : ''}`;
   const chartHeightClass = isMini ? "h-[250px]" : "h-[300px]";
+
+  if (chartData.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-400">
+        No data available for the selected filters.
+      </div>
+    );
+  }
 
   return (
     <div className={containerClass}>

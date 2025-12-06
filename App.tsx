@@ -342,10 +342,9 @@ const App = () => {
         const nameToId: Record<string, string> = {};
         const idToLatestDate: Record<string, string> = {};
 
-        // 1. Find the latest name for each App ID
+        // Prefer explicit App ID over name-only, and keep latest name for each ID
         data.forEach(item => {
             if (!item.appId) return;
-
             const existingDate = idToLatestDate[item.appId];
             if (!existingDate || item.date > existingDate) {
                 idToLatestDate[item.appId] = item.date;
@@ -353,7 +352,7 @@ const App = () => {
             }
         });
 
-        // 2. Build reverse map
+        // Build reverse map
         Object.entries(idToName).forEach(([id, name]) => {
             nameToId[name] = id;
         });
@@ -456,9 +455,13 @@ const App = () => {
     // Secondary Filters Options
     const availableAppIds = useMemo(() => {
         if (!filters.appName) return [];
-        return Array.from(new Set(data
-            .filter(d => d.appName === filters.appName)
-            .map(d => d.appId)));
+        return Array.from(
+            new Set(
+                data
+                    .filter(d => d.appName === filters.appName)
+                    .map(d => d.appId)
+            )
+        ).filter(Boolean);
     }, [data, filters.appName]);
 
     const availableGeos = useMemo(() => {
@@ -1059,7 +1062,8 @@ const App = () => {
         }
 
         // Wipe ALL data for this specific app name (regardless of ID)
-        setData(prev => prev.filter(d => d.appName !== appNameToDelete));
+        const newData = data.filter(d => d.appName !== appNameToDelete);
+        setData(newData);
 
         // Remove icon
         const newIcons = { ...appIcons };
@@ -1075,15 +1079,20 @@ const App = () => {
         // Remove from hidden apps
         setHiddenApps(prev => prev.filter(app => app !== appNameToDelete));
 
-        // Reset filters
-        setFilters({
+        // Reset filters but keep date range
+        setFilters(prev => ({
             appName: null,
             appId: 'All',
             geo: 'All',
             keyword: 'All',
-            startDate: new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            endDate: new Date().toISOString().split('T')[0]
-        });
+            startDate: prev.startDate,
+            endDate: prev.endDate
+        }));
+
+        // If nothing remains, return user to overview to avoid empty dashboard state
+        if (newData.length === 0) {
+            setCurrentPage('overview');
+        }
 
         setDeleteAllConfirmation(false);
     };
@@ -1806,7 +1815,7 @@ const App = () => {
                                         >
                                             <option value="All">{t.allIds}</option>
                                             {availableAppIds.map(id => (
-                                                <option key={id} value={id}>{id}</option>
+                                                <option key={id} value={id}>{`${filters.appName} (${id})`}</option>
                                             ))}
                                         </select>
                                         <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -2134,10 +2143,17 @@ const App = () => {
                                             <div className="flex flex-col gap-2 w-full">
                                                 <button
                                                     onClick={requestDeleteApp}
-                                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 transition-colors text-sm font-medium shadow-sm w-full"
+                                                    disabled={filters.appId === 'All' || !filters.appId}
+                                                    className={`flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border rounded-lg transition-colors text-sm font-medium shadow-sm w-full ${
+                                                        filters.appId === 'All' || !filters.appId
+                                                            ? 'border-red-100 dark:border-red-900/30 text-red-300 dark:text-red-500 cursor-not-allowed opacity-70'
+                                                            : 'border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300'
+                                                    }`}
                                                 >
                                                     <Trash2 size={16} />
-                                                    {t.deleteApp}
+                                                    {filters.appId === 'All' || !filters.appId
+                                                        ? `${t.deleteApp} (Choose the app)`
+                                                        : `${t.deleteApp} (${filters.appId})`}
                                                 </button>
                                                 <button
                                                     onClick={requestDeleteAllApps}

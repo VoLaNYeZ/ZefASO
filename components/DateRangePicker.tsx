@@ -38,6 +38,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
   const [tempEnd, setTempEnd] = useState<string | null>(endDate);
   const [showHint, setShowHint] = useState(false);
   const hintRef = useRef<HTMLDivElement>(null);
+  const [activePreset, setActivePreset] = useState<string | null>(null);
 
   // View state for the calendar (controls which month is visible)
   const [viewDate, setViewDate] = useState(startDate ? toDate(startDate) : new Date());
@@ -65,7 +66,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
     const handleScroll = () => {
       if (isOpen) setIsOpen(false);
     };
-    if (isOpen) {
+    if (isOpen && window.innerWidth >= 768) {
       window.addEventListener('scroll', handleScroll, { capture: true });
     }
     return () => window.removeEventListener('scroll', handleScroll, { capture: true });
@@ -76,6 +77,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
     if (isOpen) {
       setTempStart(startDate);
       setTempEnd(endDate);
+      setActivePreset(null);
       if (endDate) {
         setViewDate(toDate(endDate));
       }
@@ -99,6 +101,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
   const handleCancel = () => {
     setIsOpen(false);
     setShowHint(false);
+    setActivePreset(null);
   };
 
   const handlePreset = (days: number | 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'all') => {
@@ -139,9 +142,11 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
     setTempStart(toStr(start));
     setTempEnd(toStr(end));
     setViewDate(end);
+    setActivePreset(String(days));
   };
 
   const handleDateClick = (dateStr: string) => {
+    setActivePreset(null);
     if (!tempStart || (tempStart && tempEnd)) {
       setTempStart(dateStr);
       setTempEnd(null);
@@ -206,15 +211,15 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
 
     return (
       <div className="w-full sm:w-64 p-3 sm:p-4">
-        <div className="font-semibold text-slate-800 dark:text-slate-200 text-center mb-3 sm:mb-4">
-          {currentMonthDate.toLocaleDateString(theme === 'dark' ? 'en-US' : 'en-US', { month: 'long', year: 'numeric' })}
+        <div className="font-semibold text-slate-800 dark:text-slate-200 text-center mb-3 sm:mb-4 hidden md:block">
+          {currentMonthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
         </div>
         <div className="grid grid-cols-7 gap-1 text-center mb-2">
           {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
             <span key={d} className="text-xs font-medium text-slate-400 dark:text-slate-500">{d}</span>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-y-1">
+        <div className="grid grid-cols-7 gap-y-1 min-h-[200px]">
           {days}
         </div>
       </div>
@@ -277,14 +282,14 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
                 <div className="flex-1 overflow-y-auto p-3 space-y-3">
                   {/* Preset Buttons */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <button onClick={() => handlePreset('today')} className="px-2.5 py-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.today}</button>
-                    <button onClick={() => handlePreset('yesterday')} className="px-2.5 py-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.yesterday}</button>
-                    <button onClick={() => handlePreset(7)} className="px-2.5 py-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last7Days}</button>
-                    <button onClick={() => handlePreset(30)} className="px-2.5 py-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last30Days}</button>
-                    <button onClick={() => handlePreset(90)} className="px-2.5 py-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last3Months}</button>
-                    <button onClick={() => handlePreset('thisMonth')} className="px-2.5 py-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.thisMonth}</button>
-                    <button onClick={() => handlePreset('lastMonth')} className="px-2.5 py-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.lastMonth}</button>
-                    <button onClick={() => handlePreset('all')} className="px-2.5 py-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.allTime}</button>
+                    <button onClick={() => handlePreset('today')} className={`px-2.5 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${activePreset === 'today' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.today}</button>
+                    <button onClick={() => handlePreset('yesterday')} className={`px-2.5 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${activePreset === 'yesterday' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.yesterday}</button>
+                    <button onClick={() => handlePreset(7)} className={`px-2.5 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${activePreset === '7' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.last7Days}</button>
+                    <button onClick={() => handlePreset(30)} className={`px-2.5 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${activePreset === '30' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.last30Days}</button>
+                    <button onClick={() => handlePreset(90)} className={`px-2.5 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${activePreset === '90' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.last3Months}</button>
+                    <button onClick={() => handlePreset('thisMonth')} className={`px-2.5 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${activePreset === 'thisMonth' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.thisMonth}</button>
+                    <button onClick={() => handlePreset('lastMonth')} className={`px-2.5 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${activePreset === 'lastMonth' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.lastMonth}</button>
+                    <button onClick={() => handlePreset('all')} className={`px-2.5 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${activePreset === 'all' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.allTime}</button>
                   </div>
 
                   {/* Calendar Navigation */}
@@ -300,11 +305,10 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
                     </button>
                   </div>
 
-                  {/* Two Months side-by-side with horizontal scroll fallback */}
+                  {/* Single Month (centered) */}
                   <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-3 shadow-sm border border-slate-200 dark:border-slate-700">
-                    <div className="flex gap-3 overflow-x-auto pb-1">
-                      <div className="min-w-[240px] shrink-0">{renderCalendar(0)}</div>
-                      <div className="min-w-[240px] shrink-0">{renderCalendar(1)}</div>
+                    <div className="flex justify-center">
+                      <div className="w-full max-w-xs">{renderCalendar(0)}</div>
                     </div>
                   </div>
                 </div>
@@ -319,7 +323,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
                       ?
                     </button>
                     {showHint && (
-                      <div ref={hintRef} className="absolute -top-20 left-1/2 -translate-x-1/2 w-56 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg text-[11px] text-slate-600 dark:text-slate-300 px-3 py-2 flex items-start gap-2">
+                      <div ref={hintRef} className="absolute -top-24 left-1/2 -translate-x-1/2 w-56 z-50 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg text-[11px] text-slate-600 dark:text-slate-300 px-3 py-2 flex items-start gap-2 opacity-100">
                         <span className="text-indigo-500 text-xs font-bold">?</span>
                         <span className="leading-tight">{t.dateHelpHint}</span>
                         <button onClick={() => setShowHint(false)} className="ml-auto text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm px-1">✕</button>
@@ -345,16 +349,16 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
               className="hidden md:flex fixed z-[100] bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
             >
               {/* Presets Sidebar */}
-              <div className="w-40 bg-slate-50 dark:bg-slate-800/50 border-r border-slate-200 dark:border-slate-800 p-2 flex flex-col gap-1">
-                <button onClick={() => handlePreset('today')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.today}</button>
-                <button onClick={() => handlePreset('yesterday')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.yesterday}</button>
-                <button onClick={() => handlePreset(7)} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last7Days}</button>
-                <button onClick={() => handlePreset(30)} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last30Days}</button>
-                <button onClick={() => handlePreset(90)} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.last3Months}</button>
-                <button onClick={() => handlePreset('thisMonth')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.thisMonth}</button>
-                <button onClick={() => handlePreset('lastMonth')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.lastMonth}</button>
+              <div className="w-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2 flex flex-col gap-1">
+                <button onClick={() => handlePreset('today')} className={`text-left px-3 py-2 text-sm rounded-lg transition-colors ${activePreset === 'today' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.today}</button>
+                <button onClick={() => handlePreset('yesterday')} className={`text-left px-3 py-2 text-sm rounded-lg transition-colors ${activePreset === 'yesterday' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.yesterday}</button>
+                <button onClick={() => handlePreset(7)} className={`text-left px-3 py-2 text-sm rounded-lg transition-colors ${activePreset === '7' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.last7Days}</button>
+                <button onClick={() => handlePreset(30)} className={`text-left px-3 py-2 text-sm rounded-lg transition-colors ${activePreset === '30' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.last30Days}</button>
+                <button onClick={() => handlePreset(90)} className={`text-left px-3 py-2 text-sm rounded-lg transition-colors ${activePreset === '90' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.last3Months}</button>
+                <button onClick={() => handlePreset('thisMonth')} className={`text-left px-3 py-2 text-sm rounded-lg transition-colors ${activePreset === 'thisMonth' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.thisMonth}</button>
+                <button onClick={() => handlePreset('lastMonth')} className={`text-left px-3 py-2 text-sm rounded-lg transition-colors ${activePreset === 'lastMonth' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.lastMonth}</button>
                 <div className="h-px bg-slate-200 dark:bg-slate-700 my-1"></div>
-                <button onClick={() => handlePreset('all')} className="text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">{t.allTime}</button>
+                <button onClick={() => handlePreset('all')} className={`text-left px-3 py-2 text-sm rounded-lg transition-colors ${activePreset === 'all' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>{t.allTime}</button>
               </div>
 
               {/* Calendars Area */}
@@ -382,7 +386,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
                       ?
                     </button>
                     {showHint && (
-                      <div ref={hintRef} className="absolute -top-20 left-1/2 -translate-x-1/2 w-56 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg text-[11px] text-slate-600 dark:text-slate-300 px-3 py-2 flex items-start gap-2">
+                      <div ref={hintRef} className="absolute -top-24 left-1/2 -translate-x-1/2 w-56 z-50 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg text-[11px] text-slate-600 dark:text-slate-300 px-3 py-2 flex items-start gap-2">
                         <span className="text-indigo-500 text-xs font-bold">?</span>
                         <span className="leading-tight">{t.dateHelpHint}</span>
                         <button onClick={() => setShowHint(false)} className="ml-auto text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm px-1">✕</button>
