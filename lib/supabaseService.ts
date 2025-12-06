@@ -219,6 +219,14 @@ interface UserPreferences {
     apiUsage?: Record<string, any>;
 }
 
+export interface BalanceEntry {
+    id: string;
+    amount: number;
+    note: string | null;
+    entryDate: string;
+    createdAt?: string;
+}
+
 export const loadUserPreferences = async (): Promise<UserPreferences> => {
     const userId = await getUserId();
     const { data, error } = await supabase
@@ -302,6 +310,68 @@ export const saveUserPreferences = async (prefs: UserPreferences): Promise<void>
     if (error) {
         console.error('Error saving user preferences:', error);
     }
+};
+
+// ============================================
+// Balance Tracker
+// ============================================
+
+export const loadBalanceEntries = async (): Promise<BalanceEntry[]> => {
+    const userId = await getUserId();
+
+    try {
+        const { data, error } = await supabase
+            .from('balance_entries')
+            .select('*')
+            .eq('user_id', userId)
+            .order('entry_date', { ascending: false })
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error loading balance entries:', error);
+            return [];
+        }
+
+        return (data || []).map((row: any) => ({
+            id: row.id?.toString?.() ?? row.id,
+            amount: Number(row.amount) || 0,
+            note: row.note ?? null,
+            entryDate: row.entry_date || row.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+            createdAt: row.created_at
+        }));
+    } catch (err) {
+        console.error('Unexpected error loading balance entries:', err);
+        return [];
+    }
+};
+
+export const addBalanceEntry = async (entry: { amount: number; note?: string | null; entryDate: string }): Promise<BalanceEntry | null> => {
+    const userId = await getUserId();
+
+    const { data, error } = await supabase
+        .from('balance_entries')
+        .insert([{
+            user_id: userId,
+            amount: entry.amount,
+            note: entry.note || null,
+            entry_date: entry.entryDate,
+            created_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error adding balance entry:', error);
+        return null;
+    }
+
+    return {
+        id: data.id?.toString?.() ?? data.id,
+        amount: Number(data.amount) || entry.amount,
+        note: data.note ?? null,
+        entryDate: data.entry_date || entry.entryDate,
+        createdAt: data.created_at
+    };
 };
 
 // ============================================

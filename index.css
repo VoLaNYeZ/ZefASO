@@ -79,6 +79,19 @@ body {
   }
 }
 
+@keyframes shelf-bounce {
+  0%   { transform: translateY(-10px); opacity: 0; }
+  70%  { transform: translateY(0); opacity: 1; }
+  85%  { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
+}
+
+.animate-shelf {
+  animation: shelf-bounce 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: top center;
+  will-change: transform, opacity, transform-origin;
+}
+
 /* Particle float - very smooth gentle floating */
 @keyframes particle-float {
 

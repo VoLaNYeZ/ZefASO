@@ -66,6 +66,7 @@ import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
 import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, deleteAsoEntriesForApp, deleteAsoEntriesForAppName } from './lib/supabaseService';
 import { fetchSheetData, processSheetData } from './services/googleSheets';
+import { BalancePanel } from './components/BalancePanel';
 
 const App = () => {
     const mainContentRef = useRef<HTMLDivElement>(null);
@@ -364,6 +365,8 @@ const App = () => {
     const existingDataKeys = useMemo(() => {
         return new Set(data.map(item => `${item.date}-${item.appId}-${item.geo}-${item.keyword}`));
     }, [data]);
+
+    const totalInstallCost = useMemo(() => data.reduce((sum, entry) => sum + (entry.installs * (entry.cpi || 0)), 0), [data]);
 
     // Group Active Apps by Category
     const groupedApps = useMemo(() => {
@@ -1249,14 +1252,19 @@ const App = () => {
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 md:h-screen md:z-40
       `}>
                 {/* Header */}
-                <div className="p-6 border-b border-slate-800 flex justify-between items-center shrink-0">
-                    <div className="flex items-center gap-2 text-white font-bold text-xl tracking-tight cursor-pointer" onClick={() => setCurrentPage('dashboard')}>
+                <div className="p-6 border-b border-slate-800 flex items-center shrink-0 gap-3">
+                    <div className="flex items-center gap-2 text-white font-bold text-xl tracking-tight cursor-pointer shrink-0" onClick={() => setCurrentPage('dashboard')}>
                         <LayoutDashboard className="text-indigo-500" />
-                        <span>ZefASO</span>
+                        <span className="hidden md:inline">ZefASO</span>
                     </div>
-                    <button onClick={() => setIsSidebarOpen(false)} className="md:hidden">
-                        <Menu size={20} />
-                    </button>
+                    <div className="flex items-center gap-2 ml-auto">
+                        <div className="flex-1 flex justify-end">
+                            <BalancePanel session={session} totalInstallCost={totalInstallCost} />
+                        </div>
+                        <button onClick={() => setIsSidebarOpen(false)} className="shrink-0 md:hidden">
+                            <Menu size={20} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="p-4 shrink-0 space-y-2">
