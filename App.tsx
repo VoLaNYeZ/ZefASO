@@ -168,7 +168,6 @@ const App = () => {
                 setCollapsedCategories(appSettings.collapsedCategories);
                 setHiddenApps(userPrefs.hiddenApps);
                 setLang(userPrefs.lang);
-                setLang(userPrefs.lang);
                 setTheme(userPrefs.theme);
                 setIsSyncConfigured(hasSyncConfig);
 
@@ -281,7 +280,7 @@ const App = () => {
         } else {
             document.documentElement.classList.remove('dark');
         }
-    }, [theme]);
+    }, [theme, session]);
 
     // -- Localization Dictionary --
     const t = useMemo(() => {
