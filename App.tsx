@@ -1036,6 +1036,8 @@ const App = () => {
                 geo: 'All',
                 keyword: 'All'
             }));
+            // Bounce back to overview if no apps remain to avoid empty dashboard state
+            setCurrentPage('overview');
         }
     };
 
