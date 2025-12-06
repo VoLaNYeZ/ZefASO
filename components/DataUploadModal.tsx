@@ -8,7 +8,7 @@ import { DEFAULT_CPI } from '../constants';
 interface DataUploadModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onAddData: (newEntries: AsoEntry[]) => void;
+    onAddData: (newEntries: AsoEntry[]) => Promise<void> | void;
     selectedApp: string | null;
     activeApps: string[];
     existingDataKeys: Set<string>;
@@ -790,13 +790,6 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                                     >
                                                         {isImportingSheet && <RefreshCw size={14} className="animate-spin" />}
                                                         {isImportingSheet ? 'Syncing...' : 'Run Sync'}
-                                                    </button>
-                                                    <button
-                                                        onClick={handleDisconnect}
-                                                        disabled={isImportingSheet}
-                                                        className="px-4 py-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm disabled:opacity-50"
-                                                    >
-                                                        Disconnect
                                                     </button>
                                                     <button
                                                         onClick={handleDisconnect}

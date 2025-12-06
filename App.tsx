@@ -111,16 +111,25 @@ const App = () => {
         appIconsRef.current = appIcons;
     }, [appIcons]);
 
+    // Track data ref so async loaders don't overwrite fresh imports
+    const dataRef = useRef<AsoEntry[]>([]);
+    useEffect(() => {
+        dataRef.current = data;
+    }, [data]);
+
     // Track if we've already loaded data to prevent reloading on tab switch
     const hasLoadedData = useRef(false);
     const currentUserId = useRef<string | null>(null);
+    const hasUserAddedData = useRef(false);
 
     // Load initial data from Supabase when authenticated
     useEffect(() => {
         if (!session) {
             setDataLoading(false);
+            setData([]);
             hasLoadedData.current = false;
             currentUserId.current = null;
+            hasUserAddedData.current = false;
             return;
         }
 
@@ -148,19 +157,23 @@ const App = () => {
                     setLastSyncedAt(syncResult.data.last_synced_at);
                 }
 
+                const shouldHydrateData = !hasUserAddedData.current && dataRef.current.length === 0;
+
                 // Only show INITIAL_DATA if this is a brand new user:
                 // 1. No data loaded AND
                 // 2. No Google Sheets sync configured AND
                 // 3. User has never saved any settings (truly new user)
                 // If user has used the app before but deleted all data → show empty state
-                if (asoData.length > 0) {
-                    setData(asoData);
-                } else if (!hasSyncConfig && !isExistingUser) {
-                    // Brand new user - show demo data
-                    setData(INITIAL_DATA);
-                } else {
-                    // Either sync configured OR user has used the app before - show empty state
-                    setData([]);
+                if (shouldHydrateData) {
+                    if (asoData.length > 0) {
+                        setData(asoData);
+                    } else if (!hasSyncConfig && !isExistingUser) {
+                        // Brand new user - show demo data
+                        setData(INITIAL_DATA);
+                    } else {
+                        // Either sync configured OR user has used the app before - show empty state
+                        setData([]);
+                    }
                 }
 
                 setAppIcons(appSettings.appIcons);
@@ -768,25 +781,39 @@ const App = () => {
         return `https://flagcdn.com/w20/${target.toLowerCase()}.png`;
     };
 
-    const handleAddData = (newEntries: AsoEntry[]) => {
-        setData(prev => {
-            // Create a map of existing entries using a composite key to handle duplicates
-            const dataMap = new Map();
+    const mergeEntries = (existing: AsoEntry[], incoming: AsoEntry[]) => {
+        const dataMap = new Map();
 
-            // Load existing
-            prev.forEach(item => {
-                const key = `${item.date}-${item.appId}-${item.geo}-${item.keyword}`;
-                dataMap.set(key, item);
-            });
-
-            // Merge new (overwrite if exists)
-            newEntries.forEach(item => {
-                const key = `${item.date}-${item.appId}-${item.geo}-${item.keyword}`;
-                dataMap.set(key, item);
-            });
-
-            return Array.from(dataMap.values());
+        existing.forEach(item => {
+            const key = `${item.date}-${item.appId}-${item.geo}-${item.keyword}`;
+            dataMap.set(key, item);
         });
+
+        incoming.forEach(item => {
+            const key = `${item.date}-${item.appId}-${item.geo}-${item.keyword}`;
+            dataMap.set(key, item);
+        });
+
+        return Array.from(dataMap.values());
+    };
+
+    const handleAddData = async (newEntries: AsoEntry[]) => {
+        hasUserAddedData.current = true;
+        let merged: AsoEntry[] = [];
+
+        setData(prev => {
+            merged = mergeEntries(prev, newEntries);
+            return merged;
+        });
+
+        // Persist immediately to Supabase in addition to the debounced saver
+        if (session) {
+            try {
+                await saveAsoData(merged);
+            } catch (err) {
+                console.error('Immediate save failed:', err);
+            }
+        }
     };
 
     // -- Automatic Google Sheets Sync --
@@ -831,7 +858,7 @@ const App = () => {
                 }
 
                 if (newEntries.length > 0) {
-                    handleAddData(newEntries); // Merge into state
+                    await handleAddData(newEntries); // Merge into state and persist
 
                     // Update last_synced_at
                     const now = new Date().toISOString();
@@ -890,7 +917,7 @@ const App = () => {
             }
 
             if (newEntries.length > 0) {
-                handleAddData(newEntries); // Merge into state
+                await handleAddData(newEntries); // Merge into state and persist
 
                 // Update last_synced_at
                 const now = new Date().toISOString();
