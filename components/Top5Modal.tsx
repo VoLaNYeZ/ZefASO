@@ -165,7 +165,7 @@ const Top5Modal: React.FC<Top5ModalProps> = ({
 
                                     {/* Right Side: Usage / Screenshots */}
                                     {app.screenshotUrls.length > 0 && (
-                                        <div className="flex gap-2 flex-shrink-0">
+                                        <div className="hidden md:flex gap-2 flex-shrink-0">
                                             {app.screenshotUrls.slice(0, 3).map((url, idx) => (
                                                 <a
                                                     key={idx}
