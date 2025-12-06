@@ -322,7 +322,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
             {/* Header & Controls */}
             <div className="sticky top-4 z-30 bg-slate-50/70 dark:bg-slate-900/70 backdrop-blur-md rounded-xl p-4 flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-end shadow-sm">
-                <div>
+                <div className="hidden md:block">
                     <div className="flex items-center gap-3 mb-1">
                         <div className="p-2 bg-gradient-to-br from-fuchsia-500 to-pink-500 rounded-lg">
                             <LayoutGrid size={24} className="text-white" />
@@ -332,83 +332,165 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     <p className="text-slate-500 dark:text-slate-400 font-medium">{t.overviewDescription}</p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm w-full xl:w-auto">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <div className="relative group">
-                            <select
-                                value={selectedCategory}
-                                onChange={(e) => setSelectedCategory(e.target.value)}
-                                className="appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm rounded-lg pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                            >
-                                <option value="All">All Categories</option>
-                                <option value="Uncategorized">{t.uncategorized}</option>
-                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                            <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm w-full xl:w-auto">
+                    {/* Mobile compact layout */}
+                    <div className="flex md:hidden flex-col gap-2">
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="relative group">
+                                <select
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                    className="appearance-none w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm rounded-lg pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                >
+                                    <option value="All">All Categories</option>
+                                    <option value="Uncategorized">{t.uncategorized}</option>
+                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                                <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            </div>
+                            <div className="relative group">
+                                <select
+                                    value={selectedApp}
+                                    onChange={(e) => setSelectedApp(e.target.value)}
+                                    className="appearance-none w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm rounded-lg pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                >
+                                    <option value="All">All Apps</option>
+                                    {availableApps.map(app => <option key={app} value={app}>{app}</option>)}
+                                </select>
+                                <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            </div>
                         </div>
-                        <div className="relative group">
-                            <select
-                                value={selectedApp}
-                                onChange={(e) => setSelectedApp(e.target.value)}
-                                className="appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm rounded-lg pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                            >
-                                <option value="All">All Apps</option>
-                                {availableApps.map(app => <option key={app} value={app}>{app}</option>)}
-                            </select>
-                            <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <div className="grid grid-cols-2 gap-2 items-center w-full">
+                            <div className="grid grid-cols-2 gap-1">
+                                <button
+                                    onClick={() => setQuickDate('lastMonth')}
+                                    className={`h-4.5 flex items-center justify-center text-[10px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isLastMonth
+                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                        : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                        }`}
+                                >
+                                    {t.lastMonth}
+                                </button>
+                                <button
+                                    onClick={() => setQuickDate('yesterday')}
+                                    className={`h-4.5 flex items-center justify-center text-[10px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isYesterday
+                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                        : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                        }`}
+                                >
+                                    {t.yesterday || 'Yesterday'}
+                                </button>
+                                <button
+                                    onClick={() => setQuickDate('thisMonth')}
+                                    className={`h-4.5 flex items-center justify-center text-[10px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isThisMonth
+                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                        : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                        }`}
+                                >
+                                    {t.thisMonth}
+                                </button>
+                                <button
+                                    onClick={() => setQuickDate('today')}
+                                    className={`h-4.5 flex items-center justify-center text-[10px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isToday
+                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                        : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                        }`}
+                                >
+                                    {t.today || 'Today'}
+                                </button>
+                            </div>
+                            <div className="min-w-0 w-full">
+                                <DateRangePicker
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    onChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+                                    theme={theme}
+                                    t={t}
+                                    variant="overview"
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="h-px sm:h-auto sm:w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="grid grid-cols-2 gap-0.5 h-[34px] w-auto min-w-[140px]">
-                            <button
-                                onClick={() => setQuickDate('lastMonth')}
-                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isLastMonth
-                                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
-                                    : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
-                                    }`}
-                            >
-                                {t.lastMonth}
-                            </button>
-                            <button
-                                onClick={() => setQuickDate('yesterday')}
-                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isYesterday
-                                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
-                                    : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
-                                    }`}
-                            >
-                                {t.yesterday || 'Yesterday'}
-                            </button>
-                            <button
-                                onClick={() => setQuickDate('thisMonth')}
-                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isThisMonth
-                                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
-                                    : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
-                                    }`}
-                            >
-                                {t.thisMonth}
-                            </button>
-                            <button
-                                onClick={() => setQuickDate('today')}
-                                className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isToday
-                                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
-                                    : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
-                                    }`}
-                            >
-                                {t.today || 'Today'}
-                            </button>
+                    {/* Desktop / tablet layout (unchanged) */}
+                    <div className="hidden md:flex flex-col sm:flex-row gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <div className="relative group">
+                                <select
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                    className="appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm rounded-lg pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                >
+                                    <option value="All">All Categories</option>
+                                    <option value="Uncategorized">{t.uncategorized}</option>
+                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                                <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            </div>
+                            <div className="relative group">
+                                <select
+                                    value={selectedApp}
+                                    onChange={(e) => setSelectedApp(e.target.value)}
+                                    className="appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm rounded-lg pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                >
+                                    <option value="All">All Apps</option>
+                                    {availableApps.map(app => <option key={app} value={app}>{app}</option>)}
+                                </select>
+                                <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            </div>
                         </div>
-                        <div className="min-w-[180px] flex-shrink-0">
-                            <DateRangePicker
-                                startDate={startDate}
-                                endDate={endDate}
-                                onChange={(s, e) => { setStartDate(s); setEndDate(e); }}
-                                theme={theme}
-                                t={t}
-                                variant="overview"
-                            />
+
+                        <div className="h-px sm:h-auto sm:w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="grid grid-cols-2 gap-0.5 h-[34px] w-auto min-w-[140px]">
+                                <button
+                                    onClick={() => setQuickDate('lastMonth')}
+                                    className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isLastMonth
+                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                        : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                        }`}
+                                >
+                                    {t.lastMonth}
+                                </button>
+                                <button
+                                    onClick={() => setQuickDate('yesterday')}
+                                    className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isYesterday
+                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                        : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                        }`}
+                                >
+                                    {t.yesterday || 'Yesterday'}
+                                </button>
+                                <button
+                                    onClick={() => setQuickDate('thisMonth')}
+                                    className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isThisMonth
+                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                        : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                        }`}
+                                >
+                                    {t.thisMonth}
+                                </button>
+                                <button
+                                    onClick={() => setQuickDate('today')}
+                                    className={`flex items-center justify-center text-[9px] font-bold rounded transition-colors border whitespace-nowrap px-2 ${isToday
+                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-900/50 shadow-sm'
+                                        : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50'
+                                        }`}
+                                >
+                                    {t.today || 'Today'}
+                                </button>
+                            </div>
+                            <div className="min-w-[180px] flex-shrink-0">
+                                <DateRangePicker
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    onChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+                                    theme={theme}
+                                    t={t}
+                                    variant="overview"
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
