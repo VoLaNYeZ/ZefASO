@@ -35,6 +35,8 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
   // Internal state for the picker (before applying)
   const [tempStart, setTempStart] = useState<string | null>(startDate);
   const [tempEnd, setTempEnd] = useState<string | null>(endDate);
+  const [showHint, setShowHint] = useState(false);
+  const hintRef = useRef<HTMLDivElement>(null);
 
   // View state for the calendar (controls which month is visible)
   const [viewDate, setViewDate] = useState(startDate ? toDate(startDate) : new Date());
@@ -45,9 +47,11 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
       const target = event.target as Node;
       const isContainer = containerRef.current && containerRef.current.contains(target);
       const isDropdown = dropdownRef.current && dropdownRef.current.contains(target);
+      const isHint = hintRef.current && hintRef.current.contains(target);
 
-      if (!isContainer && !isDropdown) {
+      if (!isContainer && !isDropdown && !isHint) {
         setIsOpen(false);
+        setShowHint(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -92,6 +96,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
 
   const handleCancel = () => {
     setIsOpen(false);
+    setShowHint(false);
   };
 
   const handlePreset = (days: number | 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'all') => {
@@ -214,12 +219,23 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
     );
   };
 
-  const formatDisplay = () => {
+  const formatDisplay = (): React.ReactNode => {
+    const todayStr = toStr(new Date());
     if (!startDate) return t.allTime;
-    const start = new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    if (!endDate) return `${start} - ...`;
-    const end = new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `${start} - ${end}`;
+
+    const startLabel = new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const isNow = !endDate || endDate === todayStr;
+    const endLabel = isNow
+      ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">Now</span>
+      : new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    return (
+      <span className="inline-flex items-center gap-1">
+        <span>{startLabel}</span>
+        <span className="text-slate-400 dark:text-slate-500">-</span>
+        {endLabel}
+      </span>
+    );
   };
 
   return (
@@ -288,6 +304,21 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
 
                 {/* Footer Buttons */}
                 <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowHint(prev => !prev)}
+                      className="h-8 w-8 rounded-full border border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-sm font-bold"
+                    >
+                      ?
+                    </button>
+                    {showHint && (
+                      <div ref={hintRef} className="absolute -top-20 left-1/2 -translate-x-1/2 w-56 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg text-[11px] text-slate-600 dark:text-slate-300 px-3 py-2 flex items-start gap-2">
+                        <span className="text-indigo-500 text-xs font-bold">?</span>
+                        <span className="leading-tight">{t.dateHelpHint}</span>
+                        <button onClick={() => setShowHint(false)} className="ml-auto text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm px-1">✕</button>
+                      </div>
+                    )}
+                  </div>
                   <button onClick={handleCancel} className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">{t.cancel}</button>
                   <button onClick={handleApply} className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors">{t.applyRange}</button>
                 </div>
@@ -336,6 +367,21 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
                   {renderCalendar(0)}
                 </div>
                 <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowHint(prev => !prev)}
+                      className="h-8 w-8 rounded-full border border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-sm font-bold"
+                    >
+                      ?
+                    </button>
+                    {showHint && (
+                      <div ref={hintRef} className="absolute -top-20 left-1/2 -translate-x-1/2 w-56 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg text-[11px] text-slate-600 dark:text-slate-300 px-3 py-2 flex items-start gap-2">
+                        <span className="text-indigo-500 text-xs font-bold">?</span>
+                        <span className="leading-tight">{t.dateHelpHint}</span>
+                        <button onClick={() => setShowHint(false)} className="ml-auto text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm px-1">✕</button>
+                      </div>
+                    )}
+                  </div>
                   <button onClick={handleCancel} className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">{t.cancel}</button>
                   <button onClick={handleApply} className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors">{t.applyRange}</button>
                 </div>

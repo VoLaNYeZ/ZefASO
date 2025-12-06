@@ -28,6 +28,7 @@ export const translations = {
         allTime: 'All Time',
         applyRange: 'Apply Range',
         cancel: 'Cancel',
+        dateHelpHint: 'Tip: Click a day once to start the interval, click it twice to set that single day as your range.',
 
         // AI & Analysis
         aiAnalysis: 'Analysis',
@@ -211,6 +212,7 @@ export const translations = {
         allTime: 'Все время',
         applyRange: 'Применить',
         cancel: 'Отмена',
+        dateHelpHint: 'Нажмите на день один раз, чтобы начать диапазон. Нажмите дважды на тот же день, чтобы выбрать только его.',
 
         // AI & Analysis
         aiAnalysis: 'Анализ',
