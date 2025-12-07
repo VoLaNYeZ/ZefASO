@@ -65,7 +65,7 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
             'SW': 'SE',  // Sweden
             'NE': 'NL',  // Netherlands
             'NO': 'NO',  // Norway (already standard)
-            'PL': 'PO',
+            'PO': 'PL',  // Poland fix
         };
         return mapping[geo.toUpperCase()] || geo.toUpperCase();
     };

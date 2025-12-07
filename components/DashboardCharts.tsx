@@ -11,7 +11,8 @@ import {
   AreaChart,
   Area,
   BarChart,
-  Bar
+  Bar,
+  ComposedChart
 } from 'recharts';
 import { AsoEntry, Granularity } from '../types';
 
@@ -19,7 +20,7 @@ interface DashboardChartsProps {
   data: AsoEntry[];
   currencySymbol?: string;
   granularity: Granularity;
-  viewMode: 'full' | 'mini';
+  viewMode: 'full' | 'mini' | 'combined';
   theme: 'light' | 'dark';
   translations?: any;
 }
@@ -140,6 +141,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
 
   // Layout Configuration
   const isMini = viewMode === 'mini';
+  const isCombined = viewMode === 'combined';
 
   // Slice data for Mini View (show last 14 points to prevent overcrowding)
   const displayedData = useMemo(() => {
@@ -154,11 +156,138 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
 
   const chartContainerClass = `bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm ${isMini ? 'h-full' : ''}`;
   const chartHeightClass = isMini ? "h-[250px]" : "h-[300px]";
+  const combinedHeightClass = "h-[320px] md:h-[380px]";
 
   if (chartData.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-400">
         No data available for the selected filters.
+      </div>
+    );
+  }
+
+  if (isCombined) {
+    const installsLabel = translations?.installs || 'Installs';
+    const costLabel = translations?.cost || 'Cost';
+    const rankingLabel = translations?.avgAppStoreRanking || 'Avg. App Store Ranking';
+
+    return (
+      <div className="space-y-4 pb-8">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+              {translations?.combinedViewTitle || 'Installs · Cost · Ranking'}
+            </h3>
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700">
+              {translations?.totalCost || 'Total Cost'}: {currencySymbol}{totalCost.toFixed(2)}
+            </div>
+          </div>
+
+          <div className={`${combinedHeightClass} w-full min-w-0`}>
+            <ResponsiveContainer width="100%" height="100%" minHeight={260}>
+              <ComposedChart data={displayedData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11, fill: axisColor }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={xAxisFormatter}
+                />
+                <YAxis
+                  yAxisId="left"
+                  tick={{ fontSize: 11, fill: axisColor }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={34}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  reversed
+                  domain={[1, 'auto']}
+                  tick={{ fontSize: 11, fill: axisColor }}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals={false}
+                  width={36}
+                />
+                <Tooltip
+                  labelFormatter={xAxisFormatter}
+                  formatter={(value: number, name: string, props: any) => {
+                    if (props?.dataKey === 'cost') {
+                      return [`${currencySymbol}${value.toFixed(2)}`, costLabel];
+                    }
+                    if (props?.dataKey === 'ranking') {
+                      return [props?.payload?.isUnranked ? (translations?.unranked || 'Unranked') : `#${value}`, rankingLabel];
+                    }
+                    return [value, installsLabel];
+                  }}
+                  cursor={{ fill: theme === 'dark' ? '#1e293b' : '#e2e8f0', fillOpacity: 0.2 }}
+                  contentStyle={{ borderRadius: '10px', border: `1px solid ${tooltipBorder}`, backgroundColor: tooltipBg, color: tooltipText, boxShadow: '0 10px 25px -8px rgb(0 0 0 / 0.25)' }}
+                  itemStyle={{ color: tooltipText }}
+                  labelStyle={{ color: axisColor, fontWeight: 600 }}
+                />
+                <Legend
+                  verticalAlign="top"
+                  height={36}
+                  content={() => (
+                    <div className="flex items-center justify-center gap-6 px-2 pt-1 w-full">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-200">
+                        <span className="w-3 h-1 rounded-full bg-indigo-500 inline-block" />
+                        <span>{rankingLabel}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-200">
+                        <span className="w-3 h-1 rounded-full bg-orange-500 inline-block" />
+                        <span>{costLabel}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-200">
+                        <span className="w-3 h-3 rounded-[2px] bg-emerald-500 inline-block" />
+                        <span>{installsLabel}</span>
+                      </div>
+                    </div>
+                  )}
+                />
+
+                <Bar
+                  yAxisId="left"
+                  dataKey="installs"
+                  name={installsLabel}
+                  fill="#22c55e"
+                  radius={[6, 6, 0, 0]}
+                  maxBarSize={36}
+                />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="cost"
+                  name={costLabel}
+                  stroke="#f97316"
+                  strokeWidth={2}
+                  dot={false}
+                  strokeDasharray="4 4"
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="ranking"
+                  name={rankingLabel}
+                  stroke="#6366f1"
+                  strokeWidth={2.5}
+                  connectNulls={false}
+                  dot={(props: any) => {
+                    const { cx, cy, payload } = props;
+                    if (payload?.isUnranked) {
+                      return <circle cx={cx} cy={cy} r={4} fill="#ef4444" />;
+                    }
+                    return <circle cx={cx} cy={cy} r={4} fill="#6366f1" />;
+                  }}
+                  activeDot={{ r: 6 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
     );
   }

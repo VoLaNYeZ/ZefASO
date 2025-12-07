@@ -68,6 +68,24 @@ import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPre
 import { fetchSheetData, processSheetData } from './services/googleSheets';
 import { BalancePanel } from './components/BalancePanel';
 
+const VIEW_MODE_COOKIE = 'zeyf_view_mode';
+
+const readViewModeCookie = (): 'full' | 'mini' | 'combined' => {
+    if (typeof document === 'undefined') return 'mini';
+    const match = document.cookie.match(new RegExp(`${VIEW_MODE_COOKIE}=([^;]+)`));
+    const value = match ? decodeURIComponent(match[1]) : null;
+    if (value === 'full' || value === 'mini' || value === 'combined') {
+        return value;
+    }
+    return 'mini';
+};
+
+const persistViewModeCookie = (mode: 'full' | 'mini' | 'combined') => {
+    if (typeof document === 'undefined') return;
+    const maxAge = 60 * 60 * 24 * 180; // 180 days
+    document.cookie = `${VIEW_MODE_COOKIE}=${encodeURIComponent(mode)}; path=/; max-age=${maxAge}`;
+};
+
 const App = () => {
     const mainContentRef = useRef<HTMLDivElement>(null);
     // -- Auth State --
@@ -315,11 +333,15 @@ const App = () => {
     const [isHiddenSectionOpen, setIsHiddenSectionOpen] = useState(false);
     const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
     const [deleteAllConfirmation, setDeleteAllConfirmation] = useState(false);
-    const [viewMode, setViewMode] = useState<'full' | 'mini'>('mini');
+    const [viewMode, setViewMode] = useState<'full' | 'mini' | 'combined'>(() => readViewModeCookie());
     const [tickleCount, setTickleCount] = useState(0);
     const [isTickling, setIsTickling] = useState(false);
     const [tickleMsg, setTickleMsg] = useState<string | null>(null);
     const tickleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        persistViewModeCookie(viewMode);
+    }, [viewMode]);
 
     // UI State for Moving Apps
     const [movingApp, setMovingApp] = useState<string | null>(null); // The app currently being moved
@@ -1850,6 +1872,13 @@ const App = () => {
                                                 title="Full View"
                                             >
                                                 <LayoutList size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => setViewMode('combined')}
+                                                className={`p-1.5 rounded-md transition-all ${viewMode === 'combined' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                                                title="Combined View"
+                                            >
+                                                <BarChart2 size={16} />
                                             </button>
                                         </div>
 
