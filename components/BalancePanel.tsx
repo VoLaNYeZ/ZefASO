@@ -352,10 +352,8 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
 
                     <div className="rounded-xl border border-slate-800 bg-slate-900/90 shadow-xl">
                         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
-                            <div>
-                                <p className="text-[11px] uppercase text-slate-500 tracking-[0.08em] font-semibold">Activity</p>
-                                <p className="text-sm text-slate-300">{entries.length} record{entries.length === 1 ? '' : 's'}</p>
-                            </div>
+                            <p className="text-[11px] uppercase text-slate-500 tracking-[0.08em] font-semibold">Activity</p>
+                            <p className="text-sm text-slate-300">{entries.length} record{entries.length === 1 ? '' : 's'}</p>
                         </div>
                         <div className="max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 divide-y divide-slate-800">
                             {loading && (
@@ -377,10 +375,17 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
                                         {entry.amount >= 0 ? '+' : '-'}{formatCurrency(Math.abs(entry.amount)).replace('$', '')}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between text-xs text-slate-400 gap-2 leading-none">
-                                            <span className="whitespace-nowrap" title={entry.note || undefined}>{entry.entryDate}</span>
-                                            {entry.note && (
-                                                <span className="truncate max-w-[60%] text-slate-300">{entry.note}</span>
+                                        <div className="flex items-center justify-between text-xs gap-2 leading-none">
+                                            {entry.note ? (
+                                                <span
+                                                    className="whitespace-nowrap text-indigo-200 font-semibold cursor-help inline-flex items-center gap-1"
+                                                    title={`Note: ${entry.note}`}
+                                                >
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-300 shadow-[0_0_0_3px_rgba(99,102,241,0.15)]" />
+                                                    <span className="underline decoration-dotted">{entry.entryDate}</span>
+                                                </span>
+                                            ) : (
+                                                <span className="whitespace-nowrap text-slate-400">{entry.entryDate}</span>
                                             )}
                                         </div>
                                     </div>
