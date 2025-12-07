@@ -168,13 +168,20 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
     };
 
     return (
-        <div className="relative w-full max-w-[200px] ml-auto">
+        <div className="relative inline-flex shrink-0 min-w-[140px] max-w-[200px]">
             <button
                 type="button"
                 onClick={() => setExpanded(prev => !prev)}
                 className={`flex items-center gap-1.5 rounded-lg bg-slate-850 border border-slate-700 text-slate-100 px-2 py-1.5 shadow-md shadow-black/20 transition-all ${expanded ? 'ring-1 ring-indigo-500/60 bg-slate-800' : ''}`}
             >
-                <span className="font-semibold tabular-nums text-sm">{formatCurrency(totals.balance)}</span>
+                <span
+                    className="font-semibold tabular-nums"
+                    style={{
+                        fontSize: formatCurrency(totals.balance).length >= 9 ? '0.8rem' : '0.9rem'
+                    }}
+                >
+                    {formatCurrency(totals.balance)}
+                </span>
                 <span className="text-[10px] text-slate-500">{expanded ? '▴' : '▾'}</span>
             </button>
 

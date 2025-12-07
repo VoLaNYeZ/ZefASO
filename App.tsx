@@ -235,6 +235,11 @@ const App = () => {
     // -- Cross-Tab Synchronization --
     const isRemoteUpdate = useRef(false);
     const broadcastChannel = useRef<BroadcastChannel | null>(null);
+    useEffect(() => {
+        return () => {
+            if (tickleTimeoutRef.current) clearTimeout(tickleTimeoutRef.current);
+        };
+    }, []);
 
     // Initialize channel once and handle incoming messages
     useEffect(() => {
@@ -311,6 +316,10 @@ const App = () => {
     const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
     const [deleteAllConfirmation, setDeleteAllConfirmation] = useState(false);
     const [viewMode, setViewMode] = useState<'full' | 'mini'>('mini');
+    const [tickleCount, setTickleCount] = useState(0);
+    const [isTickling, setIsTickling] = useState(false);
+    const [tickleMsg, setTickleMsg] = useState<string | null>(null);
+    const tickleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // UI State for Moving Apps
     const [movingApp, setMovingApp] = useState<string | null>(null); // The app currently being moved
@@ -983,6 +992,30 @@ const App = () => {
         setTimeout(() => setShowCpiSuccess(false), 3000);
     };
 
+    // -- Brand Tickler --
+    const handleTickle = () => {
+        if (tickleCount >= 3) return;
+
+        const nextCount = tickleCount + 1;
+        setTickleCount(nextCount);
+
+        const isRu = lang === 'ru';
+        let baseMsg = '';
+        if (nextCount === 1) baseMsg = isRu ? 'эй, щекотно!' : 'hey, that tickles!';
+        else if (nextCount === 2) baseMsg = isRu ? 'хватит уже!' : 'stop that!';
+        else baseMsg = isRu ? 'позвони мне <3' : 'call me <3';
+
+        const repeated = Array(8).fill(` ${baseMsg}`).join('');
+
+        setTickleMsg(repeated);
+        setIsTickling(true);
+
+        if (tickleTimeoutRef.current) clearTimeout(tickleTimeoutRef.current);
+        tickleTimeoutRef.current = setTimeout(() => {
+            setIsTickling(false);
+        }, 5000);
+    };
+
     const requestDeleteApp = () => {
         if (filters.appName) {
             setDeleteConfirmation(filters.appName);
@@ -1266,6 +1299,18 @@ const App = () => {
 
     return (
         <div className={`flex h-screen overflow-hidden font-sans transition-colors duration-200 ${theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+            <style>{`
+                @keyframes tickleWiggle {
+                    0%,100% { transform: rotate(0deg); }
+                    25% { transform: rotate(-10deg); }
+                    50% { transform: rotate(8deg); }
+                    75% { transform: rotate(-6deg); }
+                }
+                @keyframes tickerMarquee {
+                    0% { transform: translateX(0); }
+                    100% { transform: translateX(-100%); }
+                }
+            `}</style>
             {/* Mobile Sidebar Toggle */}
             {!isSidebarOpen && (
                 <button
@@ -1290,20 +1335,41 @@ const App = () => {
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 md:h-screen md:z-40
       `}>
                 {/* Header */}
-                <div className="p-6 border-b border-slate-800 flex items-center shrink-0 gap-3">
-                    <div className="flex items-center gap-2 text-white font-bold text-xl tracking-tight cursor-pointer shrink-0" onClick={() => setCurrentPage('dashboard')}>
-                        <LayoutDashboard className="text-indigo-500" />
-                        <span className="hidden md:inline">ZefASO</span>
-                    </div>
-                    <div className="flex items-center gap-2 ml-auto">
-                        <div className="flex-1 flex justify-end">
-                            <BalancePanel session={session} totalInstallCost={totalInstallCost} />
-                        </div>
-                        <button onClick={() => setIsSidebarOpen(false)} className="shrink-0 md:hidden">
-                            <Menu size={20} />
-                        </button>
-                    </div>
+            <div className="p-6 pr-8 border-b border-slate-800 flex items-center justify-between shrink-0 gap-3">
+                <div
+                    className="flex items-center gap-2 text-white font-bold text-xl tracking-tight cursor-pointer shrink-0"
+                    onClick={() => {
+                        handleTickle();
+                    }}
+                >
+                    <LayoutDashboard
+                        className="text-indigo-500"
+                        style={isTickling ? { animation: 'tickleWiggle 0.6s ease-in-out' } : undefined}
+                    />
+                    <span className="relative hidden md:inline-block" style={{ width: '6ch' }}>
+                        <span className="block w-full overflow-hidden whitespace-nowrap">
+                            <span
+                                className="inline-block pl-2"
+                                style={
+                                    isTickling
+                                        ? { animation: 'tickerMarquee 10s linear infinite' }
+                                        : undefined
+                                }
+                            >
+                                {isTickling && tickleMsg ? `${tickleMsg}   ` : 'ZefASO'}
+                            </span>
+                        </span>
+                    </span>
                 </div>
+                <div className="flex items-center gap-2 pr-3">
+                    <div className="shrink-0">
+                        <BalancePanel session={session} totalInstallCost={totalInstallCost} />
+                    </div>
+                    <button onClick={() => setIsSidebarOpen(false)} className="shrink-0 md:hidden">
+                        <Menu size={20} />
+                    </button>
+                </div>
+            </div>
 
                 <div className="p-4 shrink-0 space-y-2">
                     {/* Global Overview Button */}

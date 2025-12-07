@@ -249,8 +249,8 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
     <div className="relative" ref={containerRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 
-          ${variant === 'compact' ? 'px-3 py-1.5 text-xs' : variant === 'overview' ? 'px-3 py-2 text-xs' : 'px-3 py-1.5 text-xs md:text-sm'} 
+        className={`flex items-center justify-center gap-1.5 sm:gap-2 
+          ${variant === 'compact' ? 'px-3 py-1.5 text-[11px] md:text-sm' : variant === 'overview' ? 'px-3 py-2 text-[11px] md:text-sm' : 'px-3 py-1.5 text-[11px] md:text-sm'} 
           bg-white 
           ${variant === 'compact' ? 'dark:bg-slate-900' : variant === 'overview' ? 'dark:bg-slate-800' : 'dark:bg-slate-700'} 
           border border-slate-200 
@@ -260,8 +260,8 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
           ${variant === 'compact' ? 'dark:text-slate-300' : variant === 'overview' ? 'dark:text-slate-200' : 'dark:text-slate-200'} 
           hover:border-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer shadow-sm w-full lg:w-auto`}
       >
-        <CalendarIcon size={16} className="text-slate-500 dark:text-slate-400" />
-        <span className="flex-1 text-left truncate">{formatDisplay()}</span>
+        <CalendarIcon size={16} className="hidden sm:inline text-slate-500 dark:text-slate-400" />
+        <span className="text-center truncate">{formatDisplay()}</span>
       </button>
 
       {isOpen && (
