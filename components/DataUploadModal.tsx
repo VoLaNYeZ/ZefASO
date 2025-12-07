@@ -235,9 +235,13 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
             return countryMap[trimmed];
         }
 
-        // If it's already a code (2-3 letters), return uppercase
+        // If it's already a code (2-3 letters), normalize known 3-letter codes too
         if (trimmed.length <= 3) {
-            return trimmed.toUpperCase();
+            const upper = trimmed.toUpperCase();
+            if (upper === 'AUS') return 'AU';
+            if (upper === 'AUT') return 'AT';
+            if (upper === 'POL') return 'PL';
+            return upper;
         }
 
         // If no mapping found, return as-is but log it

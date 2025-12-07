@@ -81,17 +81,27 @@ const parseDate = (dateStr: string): string | null => {
 // Normalize country names to ISO codes
 const normalizeGeoCode = (geo: string): string => {
     const trimmed = geo.trim();
-    if (trimmed.length <= 3) return trimmed.toUpperCase();
+    const upper = trimmed.toUpperCase();
 
+    // Explicit map for common names and 3-letter codes
     const countryMap: Record<string, string> = {
-        'United States': 'US', 'USA': 'US',
-        'United Kingdom': 'GB', 'UK': 'GB',
-        'Germany': 'DE', 'France': 'FR', 'Italy': 'IT', 'Spain': 'ES',
-        'Canada': 'CA', 'Australia': 'AU', 'Japan': 'JP', 'China': 'CN',
-        'Brazil': 'BR', 'India': 'IN', 'Russia': 'RU', 'South Korea': 'KR'
+        // Full names / variants
+        'UNITED STATES': 'US', 'USA': 'US',
+        'UNITED KINGDOM': 'GB', 'UK': 'GB',
+        'GERMANY': 'DE', 'FRANCE': 'FR', 'ITALY': 'IT', 'SPAIN': 'ES',
+        'CANADA': 'CA', 'AUSTRALIA': 'AU', 'AUSTRIA': 'AT', 'JAPAN': 'JP', 'CHINA': 'CN',
+        'BRAZIL': 'BR', 'INDIA': 'IN', 'RUSSIA': 'RU', 'SOUTH KOREA': 'KR', 'POLAND': 'PL', 'PO': 'PL',
+        // 3-letter codes that sometimes appear
+        'AUS': 'AU', 'AUT': 'AT', 'POL': 'PL'
     };
 
-    return countryMap[trimmed] || trimmed.substring(0, 2).toUpperCase();
+    if (countryMap[upper]) return countryMap[upper];
+
+    // If already 2-letter, just upper-case it
+    if (upper.length === 2) return upper;
+
+    // Fallback: first two letters uppercased
+    return upper.substring(0, 2);
 };
 
 export const processSheetData = (rows: any[][], tabName: string): AsoEntry[] => {
