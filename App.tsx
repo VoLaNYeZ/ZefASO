@@ -64,7 +64,7 @@ import { KeywordSuggester } from './components/KeywordSuggester';
 import { supabase } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
-import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, deleteAsoEntriesForApp, deleteAsoEntriesForAppName, loadAppAliases, saveAppAliasesForApp } from './lib/supabaseService';
+import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, loadAppAliases, saveAppAliasesForApp, deleteAsoEntriesForAppGroup } from './lib/supabaseService';
 import { fetchSheetData, processSheetData } from './services/googleSheets';
 import { BalancePanel } from './components/BalancePanel';
 import { AppAliasManager } from './components/AppAliasManager';
@@ -416,38 +416,39 @@ const App = () => {
     const [granularity, setGranularity] = useState<Granularity>('Daily');
 
     // -- App Resolution Logic (Merge by ID) --
-    const appResolution = useMemo(() => {
-        const idToName: Record<string, string> = {};
-        const nameToId: Record<string, string> = {};
-        const idToLatestDate: Record<string, string> = {};
-
-        // Prefer explicit App ID over name-only, and keep latest name for each ID
+    const appIdLabelsByGroup: Record<string, Record<string, { name: string; date: string }>> = useMemo(() => {
+        const map: Record<string, Record<string, { name: string; date: string }>> = {};
         data.forEach(item => {
-            if (!item.appId) return;
-            const existingDate = idToLatestDate[item.appId];
-            if (!existingDate || item.date > existingDate) {
-                idToLatestDate[item.appId] = item.date;
-                idToName[item.appId] = item.appName;
+            const group = item.appGroup || item.appName;
+            if (!map[group]) map[group] = {};
+            const existing = map[group][item.appId];
+            if (!existing || item.date > existing.date) {
+                map[group][item.appId] = { name: item.appName, date: item.date };
             }
         });
-
-        // Build reverse map
-        Object.entries(idToName).forEach(([id, name]) => {
-            nameToId[name] = id;
-        });
-
-        return { idToName, nameToId };
+        return map;
     }, [data]);
+
+    const latestIdByGroup = useMemo(() => {
+        const map: Record<string, string> = {};
+        Object.entries(appIdLabelsByGroup).forEach(([group, ids]) => {
+            let latestId: string | null = null;
+            let latestDate = '';
+            Object.entries(ids).forEach(([id, info]) => {
+                if (!latestId || info.date > latestDate) {
+                    latestId = id;
+                    latestDate = info.date;
+                }
+            });
+            if (latestId) map[group] = latestId;
+        });
+        return map;
+    }, [appIdLabelsByGroup]);
 
     // -- Derived Data --
     const uniqueApps = useMemo(() => {
-        // Return only the canonical names (values of idToName)
-        // If an app has no ID (legacy?), fallback to its name
-        const withIds = new Set(Object.values(appResolution.idToName));
-        const withoutIds = data.filter(d => !d.appId).map(d => d.appName);
-
-        return Array.from(new Set([...withIds, ...withoutIds])).sort();
-    }, [data, appResolution]);
+        return Array.from(new Set(data.map(d => d.appGroup || d.appName))).sort();
+    }, [data]);
 
     const activeApps = useMemo(() => uniqueApps.filter(app => !hiddenApps.includes(app)), [uniqueApps, hiddenApps]);
     const archivedAppsList = useMemo(() => uniqueApps.filter(app => hiddenApps.includes(app)), [uniqueApps, hiddenApps]);
@@ -509,16 +510,15 @@ const App = () => {
     const latestCPI = useMemo(() => {
         if (!filters.appName) return '0.09';
 
-        const selectedAppId = appResolution.nameToId[filters.appName];
-
-        // Filter by ID if possible
-        const appEntries = data.filter(d => selectedAppId ? d.appId === selectedAppId : d.appName === filters.appName);
+        const appEntries = data.filter(d =>
+            d.appGroup === filters.appName &&
+            (filters.appId === 'All' || d.appId === filters.appId)
+        );
 
         if (appEntries.length === 0) return '0.09';
-        // Find entry with latest date
         const latest = appEntries.reduce((prev, current) => (prev.date > current.date) ? prev : current);
         return latest.cpi.toString();
-    }, [data, filters.appName, appResolution]);
+    }, [data, filters.appName, filters.appId]);
 
     // Sync input with latest CPI
     useEffect(() => {
@@ -537,7 +537,7 @@ const App = () => {
         return Array.from(
             new Set(
                 data
-                    .filter(d => d.appName === filters.appName)
+                    .filter(d => d.appGroup === filters.appName)
                     .map(d => d.appId)
             )
         ).filter(Boolean);
@@ -546,16 +546,18 @@ const App = () => {
     const availableGeos = useMemo(() => {
         if (!filters.appName) return [];
         return Array.from(new Set(data
-            .filter(d => d.appName === filters.appName)
+            .filter(d => d.appGroup === filters.appName)
             .map(d => d.geo)));
     }, [data, filters.appName]);
 
     const availableKeywords = useMemo(() => {
         if (!filters.appName) return [];
         return Array.from(new Set(data
-            .filter(d => d.appName === filters.appName && (filters.geo === 'All' || d.geo === filters.geo))
+            .filter(d => d.appGroup === filters.appName && (filters.geo === 'All' || d.geo === filters.geo))
             .map(d => d.keyword)));
     }, [data, filters.appName, filters.geo]);
+
+    const idLabelsForSelected: Record<string, { name: string; date: string }> | undefined = filters.appName ? appIdLabelsByGroup[filters.appName] : undefined;
 
     // -- Preview Geo State --
     // This controls the GEO for the App Store link independently of the dashboard filter
@@ -579,10 +581,8 @@ const App = () => {
         if (filters.appId !== 'All') {
             rawId = filters.appId;
         } else if (filters.appName) {
-            // Find the latest App ID for the selected App Name based on date
-            const appEntries = data.filter(d => d.appName === filters.appName);
+            const appEntries = data.filter(d => d.appGroup === filters.appName);
             if (appEntries.length > 0) {
-                // Sort by date descending to get the most recent entry
                 const latestEntry = appEntries.reduce((prev, current) =>
                     (prev.date > current.date) ? prev : current
                 );
@@ -679,7 +679,11 @@ const App = () => {
                 attemptedBackgroundFetches.current.add(appName);
 
                 // Find the ID for this app
-                const appId = appResolution.nameToId[appName];
+                const appId =
+                    latestIdByGroup[appName] ||
+                    data
+                        .filter(d => (d.appGroup || d.appName) === appName)
+                        .sort((a, b) => b.date.localeCompare(a.date))[0]?.appId;
                 // Resolve numeric ID from string ID if needed
                 const match = appId ? appId.match(/(\d+)/) : null;
                 const numericId = match ? match[0] : null;
@@ -709,7 +713,7 @@ const App = () => {
                         }
                     } else {
                         // If US failed, try a fallback from available data for this app
-                        const appGeos = data.filter(d => d.appName === appName).map(d => d.geo);
+                        const appGeos = data.filter(d => (d.appGroup || d.appName) === appName).map(d => d.geo);
                         const uniqueGeos = Array.from(new Set(appGeos)).filter(g => g !== 'US');
 
                         if (uniqueGeos.length > 0) {
@@ -747,7 +751,7 @@ const App = () => {
             isMounted = false;
             clearTimeout(timer);
         };
-    }, [activeApps, appResolution, data]); // Intentionally omitting appIcons to avoid re-running on every update. 
+    }, [activeApps, latestIdByGroup, data]); // Intentionally omitting appIcons to avoid re-running on every update. 
     // We rely on the initial filter + attempted set.
 
 
@@ -763,17 +767,9 @@ const App = () => {
     const filteredData = useMemo(() => {
         if (!filters.appName) return [];
 
-        // Resolve selected name to ID
-        const selectedAppId = appResolution.nameToId[filters.appName];
-
         let res = data.filter(item => {
-            // Filter by ID if we have one (merging duplicates), otherwise fallback to name
-            if (selectedAppId) {
-                if (item.appId !== selectedAppId) return false;
-            } else {
-                if (item.appName !== filters.appName) return false;
-            }
-
+            const group = item.appGroup || item.appName;
+            if (group !== filters.appName) return false;
             if (filters.appId !== 'All' && item.appId !== filters.appId) return false;
             if (filters.geo !== 'All' && item.geo !== filters.geo) return false;
             if (filters.keyword !== 'All' && item.keyword !== filters.keyword) return false;
@@ -794,7 +790,7 @@ const App = () => {
     const allAppKeywords = useMemo(() => {
         if (!filters.appName) return [];
         return Array.from(new Set(data
-            .filter(d => d.appName === filters.appName)
+            .filter(d => (d.appGroup || d.appName) === filters.appName)
             .map(d => d.keyword)));
     }, [data, filters.appName]);
 
@@ -1052,7 +1048,7 @@ const App = () => {
         if (cpiConfirmation === null || !filters.appName) return;
 
         setData(prev => prev.map(item =>
-            item.appName === filters.appName
+            (item.appGroup || item.appName) === filters.appName
                 ? { ...item, cpi: cpiConfirmation }
                 : item
         ));
@@ -1096,15 +1092,11 @@ const App = () => {
         if (!deleteConfirmation) return;
 
         const appName = deleteConfirmation;
-        const appIdToDelete = appResolution.nameToId[appName];
 
-        // Delete from database explicitly
-        if (appIdToDelete) {
-            await deleteAsoEntriesForApp(appIdToDelete);
-        }
+        await deleteAsoEntriesForAppGroup(appName);
 
-        // Filter out all entries for this app (by ID if possible, else Name)
-        const newData = data.filter(d => appIdToDelete ? d.appId !== appIdToDelete : d.appName !== appName);
+        // Filter out all entries for this app group
+        const newData = data.filter(d => d.appGroup !== appName);
         setData(newData);
 
         // Remove from hidden list if present
@@ -1121,7 +1113,7 @@ const App = () => {
         setAppCategoryMap(newCatMap);
 
         // Switch filter to another app if possible
-        const remainingApps = Array.from(new Set(newData.map(d => d.appName)));
+        const remainingApps = Array.from(new Set(newData.map(d => d.appGroup || d.appName)));
 
         setDeleteConfirmation(null); // Close modal
 
@@ -1158,14 +1150,14 @@ const App = () => {
 
         try {
             // Delete from Supabase first
-            await deleteAsoEntriesForAppName(appNameToDelete);
+            await deleteAsoEntriesForAppGroup(appNameToDelete);
         } catch (error) {
             console.error('Failed to delete from database:', error);
             // Continue with local cleanup even if DB delete fails
         }
 
         // Wipe ALL data for this specific app name (regardless of ID)
-        const newData = data.filter(d => d.appName !== appNameToDelete);
+        const newData = data.filter(d => (d.appGroup || d.appName) !== appNameToDelete);
         setData(newData);
 
         // Remove icon
@@ -1885,6 +1877,7 @@ const App = () => {
                         <ComparisonDashboard
                             data={data}
                             activeApps={activeApps}
+                            appIdLabelsByGroup={appIdLabelsByGroup}
                             getCountryFlag={getCountryFlag}
                             theme={theme}
                             t={t}
@@ -2002,7 +1995,9 @@ const App = () => {
                                         >
                                             <option value="All">{t.allIds}</option>
                                             {availableAppIds.map(id => (
-                                                <option key={id} value={id}>{`${filters.appName} (${id})`}</option>
+                                                <option key={id} value={id}>
+                                                    {(idLabelsForSelected?.[id]?.name || filters.appName || id) + ` (${id})`}
+                                                </option>
                                             ))}
                                         </select>
                                         <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -2206,8 +2201,8 @@ const App = () => {
 
                             {/* Real-Time Standings Section */}
                             {filters.appName && (() => {
-                                // Find ALL entries for this app (ignoring filters) to get the truly latest one
-                                const allAppEntries = data.filter(d => d.appName === filters.appName);
+                                // Find ALL entries for this app group (ignoring filters) to get the truly latest one
+                                const allAppEntries = data.filter(d => (d.appGroup || d.appName) === filters.appName);
                                 if (allAppEntries.length === 0) return null;
 
                                 // Get the latest entry by date
@@ -2217,17 +2212,19 @@ const App = () => {
 
                                 // Get all unique keyword/geo pairs for this specific app+id combination
                                 const itemsForLatestApp = data
-                                    .filter(d => d.appName === filters.appName && d.appId === latestEntry.appId)
+                                    .filter(d => (d.appGroup || d.appName) === filters.appName && d.appId === latestEntry.appId)
                                     .map(d => ({ keyword: d.keyword, geo: d.geo }))
                                     .filter((item, index, self) =>
                                         index === self.findIndex(t => t.keyword === item.keyword && t.geo === item.geo)
                                     );
 
+                                const displayName = latestEntry.appName || filters.appName;
+
                                 return (
                                     <div className="mt-8">
                                         <RealtimeStandings
                                             appId={latestEntry.appId}
-                                            appName={filters.appName}
+                                            appName={displayName}
                                             appIcon={appIcons[filters.appName]}
                                             items={itemsForLatestApp}
                                             getCountryFlag={getCountryFlag}
@@ -2359,6 +2356,7 @@ const App = () => {
                                                     aliases={appAliases[filters.appName] || []}
                                                     onSave={(rows) => handleSaveAliases(filters.appName!, rows)}
                                                     suggestedPrefix={defaultAliasPrefix}
+                                                    idLabelMap={idLabelsForSelected ? Object.fromEntries(Object.entries(idLabelsForSelected).map(([id, info]) => [id, info.name ? `${info.name} (${id})` : `${filters.appName} (${id})`])) : undefined}
                                                     t={t}
                                                 />
                                             </div>

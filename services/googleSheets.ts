@@ -168,7 +168,8 @@ export const processSheetData = (rows: any[][], tabName: string): AsoEntry[] => 
         if (row.length < 8) continue;
 
         const dateRaw = String(row[0]);
-        const appName = tabName;
+        const appGroup = tabName;
+        const appName = String(row[1] ?? tabName).trim();
         const geo = normalizeGeoCode(String(row[2]));
         const csvIdRaw = String(row[3]).trim();
         const keyword = String(row[4]).trim();
@@ -197,6 +198,7 @@ export const processSheetData = (rows: any[][], tabName: string): AsoEntry[] => 
                 id: `sheet-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 date: date,
                 appName: appName,
+                appGroup: appGroup,
                 geo: geo,
                 appId: normalizedId,
                 keyword: keyword,

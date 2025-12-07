@@ -49,7 +49,8 @@ interface OverviewGroup {
 }
 
 interface ProcessedApp {
-    appName: string;
+    appName: string; // Active App (tab name)
+    displayName: string; // Latest Store App name for context
     totalCost: number;
     totalInstalls: number;
     groups: OverviewGroup[];
@@ -147,26 +148,29 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         const effectiveEnd = endDate || '9999-99-99';
 
         const filteredRaw = data.filter(d => {
+            const group = d.appGroup || d.appName;
             if (d.date < effectiveStart || d.date > effectiveEnd) return false;
             if (selectedCategory !== 'All') {
-                const appCat = appCategoryMap[d.appName] || 'Uncategorized';
+                const appCat = appCategoryMap[group] || 'Uncategorized';
                 if (appCat !== selectedCategory) return false;
             }
-            if (selectedApp !== 'All' && d.appName !== selectedApp) return false;
+            if (selectedApp !== 'All' && group !== selectedApp) return false;
             return true;
         });
 
         // 2. Group by App
         const appsMap = new Map<string, AsoEntry[]>();
         filteredRaw.forEach(d => {
-            if (!appsMap.has(d.appName)) appsMap.set(d.appName, []);
-            appsMap.get(d.appName)?.push(d);
+            const group = d.appGroup || d.appName;
+            if (!appsMap.has(group)) appsMap.set(group, []);
+            appsMap.get(group)?.push(d);
         });
 
         // 3. Process each App
         const processed = Array.from(appsMap.entries()).map(([appName, entries]) => {
             const totalCost = entries.reduce((acc, curr) => acc + (curr.installs * curr.cpi), 0);
             const totalInstalls = entries.reduce((acc, curr) => acc + curr.installs, 0);
+            const latestEntryForLabel = entries.reduce((latest, curr) => curr.date > latest.date ? curr : latest, entries[0]);
 
             const groups: OverviewGroup[] = [];
 
@@ -265,6 +269,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
             return {
                 appName,
+                displayName: latestEntryForLabel?.appName || appName,
                 totalCost,
                 totalInstalls,
                 groups
@@ -315,7 +320,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     // -- Grand Totals --
     const grandTotalCost = aggregatedData.reduce((acc, curr) => acc + curr.totalCost, 0);
     const activeAppsCount = aggregatedData.length;
-    const availableApps = useMemo(() => Array.from(new Set(data.map(d => d.appName))).sort(), [data]);
+    const availableApps = useMemo(() => Array.from(new Set(data.map(d => d.appGroup || d.appName))).sort(), [data]);
 
     return (
         <div className="p-6 pb-20 pt-16 md:pt-6 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
@@ -615,13 +620,13 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                 {appIcons[app.appName] ? (
                                     <img
                                         src={appIcons[app.appName]}
-                                        alt={app.appName}
+                                        alt={app.displayName || app.appName}
                                         loading="eager"
                                         className="w-14 h-14 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm object-cover bg-white"
                                     />
                                 ) : (
                                     <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center text-slate-500 dark:text-slate-300 font-bold text-xl">
-                                        {app.appName.charAt(0)}
+                                        {(app.displayName || app.appName).charAt(0)}
                                     </div>
                                 )}
                                 <div>
@@ -637,8 +642,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                     </div>
                                     {/* Store Links */}
                                     <div className="flex flex-wrap gap-1.5 mt-2">
-                                        {Array.from(new Set(data.filter(d => d.appName === app.appName).map(d => d.geo))).sort().map(geo => {
-                                            const entry = data.find(d => d.appName === app.appName && d.geo === geo);
+                                        {Array.from(new Set(data.filter(d => (d.appGroup || d.appName) === app.appName).map(d => d.geo))).sort().map(geo => {
+                                            const entry = data.find(d => (d.appGroup || d.appName) === app.appName && d.geo === geo);
                                             const match = entry?.appId.match(/(\d+)/);
                                             const id = match ? match[0] : '';
                                             if (!id) return null;

@@ -2,7 +2,8 @@
 export interface AsoEntry {
   id: string; // Unique record ID
   date: string; // YYYY-MM-DD
-  appName: string;
+  appName: string; // Store app name from sheet
+  appGroup: string; // Active App (tab name)
   geo: string;
   appId: string; // The specific AppStore ID
   keyword: string;

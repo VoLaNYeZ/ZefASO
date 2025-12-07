@@ -17,7 +17,7 @@ interface DataUploadModalProps {
     onSyncStatusChange?: (isActive: boolean) => void;
 }
 
-type ImportStrategy = 'existing' | 'new' | 'bulk' | 'sheets';
+type ImportStrategy = 'existing' | 'new' | 'sheets';
 type InputMethod = 'paste' | 'file' | 'manual';
 
 export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClose, onAddData, selectedApp, activeApps, existingDataKeys, theme, t, onSyncStatusChange }) => {
@@ -351,6 +351,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                         id: `import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                         date: date,
                         appName: sidebarAppName,
+                        appGroup: sidebarAppName,
                         geo: normalizeGeoCode(cols[2]) || 'Unknown',
                         appId: compositeId,
                         keyword: cols[4].trim() || 'None',
@@ -407,6 +408,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
             id: `${appNameTrimmed}-${manualFormData.geo}-${Date.now()}`,
             date: manualFormData.date,
             appName: appNameTrimmed,
+            appGroup: appNameTrimmed,
             geo: manualFormData.geo.trim(),
             appId: `${appNameTrimmed} ${manualFormData.appId}`,
             keyword: manualFormData.keyword.trim(),
@@ -440,8 +442,6 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
             }
             targetName = targetNewApp;
         }
-        // if strategy is 'bulk', targetName remains undefined, causing parser to use CSV columns
-
         parseAndSubmit(bulkText, targetName);
     };
 
@@ -625,7 +625,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                             {/* 1. Choose Target Strategy */}
                             <div className="mb-6">
                                 <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block mb-3">1. {t.whereDataGo}</label>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     <button
                                         onClick={() => { setStrategy('existing'); setInputMethod('paste'); }}
                                         className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${strategy === 'existing'
@@ -646,17 +646,6 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                     >
                                         <FolderPlus className="mb-2" size={24} />
                                         <span className="text-sm font-semibold">{t.createNewApp}</span>
-                                    </button>
-
-                                    <button
-                                        onClick={() => { setStrategy('bulk'); setInputMethod('paste'); }}
-                                        className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${strategy === 'bulk'
-                                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
-                                            : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-200 dark:hover:border-slate-700'
-                                            }`}
-                                    >
-                                        <Layers className="mb-2" size={24} />
-                                        <span className="text-sm font-semibold">{t.smartBulk}</span>
                                     </button>
 
                                     <button
@@ -708,7 +697,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                 </div>
                             )}
 
-                            {strategy === 'bulk' && (
+                            {false && (
                                 <div className="mb-6 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-400 animate-in fade-in slide-in-from-top-2">
                                     <p><strong>{t.smartBulkMode}:</strong> {t.smartBulkDesc}</p>
                                     <ul className="list-disc pl-5 mt-1 space-y-1 text-xs">
@@ -896,14 +885,12 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                         >
                                             {t.csvFile}
                                         </button>
-                                        {strategy !== 'bulk' && (
-                                            <button
-                                                onClick={() => setInputMethod('manual')}
-                                                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${inputMethod === 'manual' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
-                                            >
-                                                {t.manualEntry}
-                                            </button>
-                                        )}
+                                        <button
+                                            onClick={() => setInputMethod('manual')}
+                                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${inputMethod === 'manual' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+                                        >
+                                            {t.manualEntry}
+                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -950,7 +937,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                     </div>
                                 )}
 
-                                {inputMethod === 'manual' && strategy !== 'bulk' && strategy !== 'sheets' && (
+                                {inputMethod === 'manual' && strategy !== 'sheets' && (
                                     <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <label className="text-xs font-semibold text-slate-500 uppercase">Date</label>

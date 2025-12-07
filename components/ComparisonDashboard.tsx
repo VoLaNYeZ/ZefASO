@@ -8,12 +8,13 @@ import { Plus, RotateCcw, FlaskConical, LayoutGrid, LayoutList, GitCompare, Zap 
 interface ComparisonDashboardProps {
     data: AsoEntry[];
     activeApps: string[];
+    appIdLabelsByGroup?: Record<string, Record<string, { name: string; date: string }>>;
     getCountryFlag: (geo: string) => string;
     theme: 'light' | 'dark';
     t: any;
 }
 
-export const ComparisonDashboard: React.FC<ComparisonDashboardProps> = ({ data, activeApps, getCountryFlag, theme, t }) => {
+export const ComparisonDashboard: React.FC<ComparisonDashboardProps> = ({ data, activeApps, appIdLabelsByGroup, getCountryFlag, theme, t }) => {
     // -- Active Tab --
     const [activeTab, setActiveTab] = useState<'comparison' | 'optimization'>('comparison');
 
@@ -256,17 +257,18 @@ export const ComparisonDashboard: React.FC<ComparisonDashboardProps> = ({ data, 
                     ) : (
                         <div className={`grid gap-6 ${layout === 'grid' ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-1'}`}>
                             {blocks.map(block => (
-                                <ComposedAppChart
-                                    key={block.id}
-                                    block={block}
-                                    allData={data}
-                                    availableApps={activeApps}
-                                    getCountryFlag={getCountryFlag}
-                                    onUpdate={updateBlock}
-                                    onDelete={deleteBlock}
-                                    theme={theme}
-                                    t={t}
-                                />
+                        <ComposedAppChart
+                            key={block.id}
+                            block={block}
+                            allData={data}
+                            availableApps={activeApps}
+                            idLabelsByGroup={appIdLabelsByGroup}
+                            getCountryFlag={getCountryFlag}
+                            onUpdate={updateBlock}
+                            onDelete={deleteBlock}
+                            theme={theme}
+                            t={t}
+                        />
                             ))}
                         </div>
                     )}

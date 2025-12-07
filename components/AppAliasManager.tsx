@@ -8,6 +8,7 @@ interface AppAliasManagerProps {
     aliases: AppAlias[];
     onSave: (aliases: { appId: string; prefix: string; number: string; isPrimary: boolean }[]) => Promise<void>;
     suggestedPrefix?: string | null;
+    idLabelMap?: Record<string, string>;
     t: any;
 }
 
@@ -18,7 +19,7 @@ interface AliasRow {
     isPrimary: boolean;
 }
 
-export const AppAliasManager: React.FC<AppAliasManagerProps> = ({ appName, appIds, aliases, onSave, suggestedPrefix, t }) => {
+export const AppAliasManager: React.FC<AppAliasManagerProps> = ({ appName, appIds, aliases, onSave, suggestedPrefix, idLabelMap, t }) => {
     const [rows, setRows] = useState<AliasRow[]>([]);
     const [saving, setSaving] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -109,7 +110,7 @@ export const AppAliasManager: React.FC<AppAliasManagerProps> = ({ appName, appId
                     >
                         <div className="flex flex-col min-w-0">
                             <span className="text-[11px] uppercase font-semibold text-slate-500 dark:text-slate-400">App ID</span>
-                            <span className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{appName} ({row.appId})</span>
+                            <span className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{idLabelMap?.[row.appId] || `${appName} (${row.appId})`}</span>
                         </div>
 
                         <div className="flex flex-col items-start gap-1">

@@ -18,6 +18,7 @@ interface ComposedAppChartProps {
     block: ComparisonBlock;
     allData: AsoEntry[];
     availableApps: string[];
+    idLabelsByGroup?: Record<string, Record<string, { name: string; date: string }>>;
     getCountryFlag: (geo: string) => string;
     onUpdate: (id: string, field: keyof ComparisonBlock, value: string | null) => void;
     onDelete: (id: string) => void;
@@ -30,6 +31,7 @@ export const ComposedAppChart: React.FC<ComposedAppChartProps> = ({
     block,
     allData,
     availableApps,
+    idLabelsByGroup,
     getCountryFlag,
     onUpdate,
     onDelete,
@@ -46,8 +48,13 @@ export const ComposedAppChart: React.FC<ComposedAppChartProps> = ({
 
     // 1. Get Dropdown Options based on selected App Name
     const appSpecificData = useMemo(() => {
-        return allData.filter(d => d.appName === block.appName);
+        return allData.filter(d => (d.appGroup || d.appName) === block.appName);
     }, [allData, block.appName]);
+
+    const idLabelMap = useMemo(() => {
+        if (!idLabelsByGroup) return undefined;
+        return idLabelsByGroup[block.appName];
+    }, [idLabelsByGroup, block.appName]);
 
     const availableIds = useMemo(() => Array.from(new Set(appSpecificData.map(d => d.appId))), [appSpecificData]);
     const availableGeos = useMemo(() => Array.from(new Set(appSpecificData.map(d => d.geo))), [appSpecificData]);
@@ -220,7 +227,10 @@ export const ComposedAppChart: React.FC<ComposedAppChartProps> = ({
                             className="w-full appearance-none pl-7 pr-6 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-medium text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-600 outline-none cursor-pointer truncate"
                         >
                             <option value="All">{t.allIds}</option>
-                            {availableIds.map(id => <option key={id} value={id}>{id}</option>)}
+                            {availableIds.map(id => {
+                                const label = idLabelMap?.[id]?.name ? `${idLabelMap[id].name} (${id})` : id;
+                                return <option key={id} value={id}>{label}</option>;
+                            })}
                         </select>
                         <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>

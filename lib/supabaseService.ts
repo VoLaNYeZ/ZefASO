@@ -29,6 +29,7 @@ export const loadAsoData = async (): Promise<AsoEntry[]> => {
         id: row.id.toString(),
         date: row.date,
         appName: row.app_name,
+        appGroup: row.app_group || row.app_name,
         appId: row.app_id,
         geo: row.geo,
         keyword: row.keyword,
@@ -46,6 +47,7 @@ export const saveAsoData = async (entries: AsoEntry[]): Promise<void> => {
         user_id: userId,
         date: entry.date,
         app_name: entry.appName,
+        app_group: entry.appGroup || entry.appName,
         app_id: entry.appId,
         geo: entry.geo,
         keyword: entry.keyword,
@@ -117,6 +119,20 @@ export const deleteAsoEntriesForApp = async (appId: string): Promise<void> => {
 
     if (error) {
         console.error('Error deleting app entries:', error);
+    }
+};
+
+export const deleteAsoEntriesForAppGroup = async (appGroup: string): Promise<void> => {
+    const userId = await getUserId();
+
+    const { error } = await supabase
+        .from('aso_entries')
+        .delete()
+        .eq('user_id', userId)
+        .eq('app_group', appGroup);
+
+    if (error) {
+        console.error('Error deleting app group entries:', error);
     }
 };
 
