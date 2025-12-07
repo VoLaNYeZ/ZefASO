@@ -44,6 +44,13 @@ export const translations = {
         deleteApp: 'Delete Application',
         permanentlyRemove: 'Permanently remove this application and all its data.',
         update: 'Update',
+        aliases: 'Aliases',
+        aliasDescription: 'Set a short alias for each App ID. Pick one primary alias to show in the sidebar.',
+        aliasPrefix: 'Letters',
+        aliasNumber: 'Number',
+        aliasPrimary: 'Primary',
+        aliasSave: 'Save aliases',
+        aliasSaved: 'Aliases saved',
 
         // Overview Dashboard
         totalSpend: 'Total Spend',
@@ -228,6 +235,13 @@ export const translations = {
         deleteApp: 'Удалить приложение',
         permanentlyRemove: 'Навсегда удалить это приложение и все его данные.',
         update: 'Обновить',
+        aliases: 'Псевдонимы',
+        aliasDescription: 'Задайте короткий псевдоним для каждого App ID. Выберите основной псевдоним для сайдбара.',
+        aliasPrefix: 'Буквы',
+        aliasNumber: 'Номер',
+        aliasPrimary: 'Основной',
+        aliasSave: 'Сохранить псевдонимы',
+        aliasSaved: 'Псевдонимы сохранены',
 
         // Overview Dashboard
         totalSpend: 'Общий расход',

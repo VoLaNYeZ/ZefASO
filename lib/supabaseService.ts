@@ -232,6 +232,24 @@ export interface BalanceEntry {
     createdAt?: string;
 }
 
+export interface AppAlias {
+    id?: string;
+    appName: string;
+    appId: string;
+    prefix: string;
+    number: string;
+    isPrimary: boolean;
+}
+
+export interface AppAlias {
+    id?: string;
+    appName: string;
+    appId: string;
+    prefix: string;
+    number: string;
+    isPrimary: boolean;
+}
+
 export const loadUserPreferences = async (): Promise<UserPreferences> => {
     const userId = await getUserId();
     const { data, error } = await supabase
@@ -382,6 +400,87 @@ export const addBalanceEntry = async (entry: { amount: number; note?: string | n
         entryDate: data.entry_date || entry.entryDate,
         createdAt: data.created_at
     };
+};
+
+// ============================================
+// App Aliases
+// ============================================
+
+export const loadAppAliases = async (): Promise<AppAlias[]> => {
+    const userId = await getUserId();
+
+    try {
+        const { data, error } = await supabase
+            .from('app_aliases')
+            .select('*')
+            .eq('user_id', userId);
+
+        if (error) {
+            console.error('Error loading app aliases:', error);
+            return [];
+        }
+
+        return (data || []).map((row: any) => ({
+            id: row.id?.toString?.() ?? row.id,
+            appName: row.app_name,
+            appId: row.app_id,
+            prefix: row.prefix || '',
+            number: row.number || '',
+            isPrimary: !!row.is_primary
+        }));
+    } catch (err) {
+        console.error('Unexpected error loading app aliases:', err);
+        return [];
+    }
+};
+
+export const saveAppAliasesForApp = async (appName: string, aliases: Omit<AppAlias, 'id' | 'appName'>[]): Promise<AppAlias[]> => {
+    const userId = await getUserId();
+
+    // Keep DB in sync: remove existing rows for this app/user, then insert current state
+    const { error: deleteError } = await supabase
+        .from('app_aliases')
+        .delete()
+        .eq('user_id', userId)
+        .eq('app_name', appName);
+
+    if (deleteError) {
+        console.error('Error clearing aliases before save:', deleteError);
+        throw deleteError;
+    }
+
+    if (aliases.length === 0) {
+        return [];
+    }
+
+    const payload = aliases.map(alias => ({
+        user_id: userId,
+        app_name: appName,
+        app_id: alias.appId,
+        prefix: alias.prefix,
+        number: alias.number,
+        is_primary: alias.isPrimary,
+        updated_at: new Date().toISOString()
+    }));
+
+    const { data, error } = await supabase
+        .from('app_aliases')
+        .insert(payload)
+        .select();
+
+    if (error) {
+        console.error('Error saving app aliases:', error);
+        throw error;
+    }
+
+    return (data || []).map((row: any) => ({
+        id: row.id?.toString?.() ?? row.id,
+        appName: row.app_name,
+        appId: row.app_id,
+        prefix: row.prefix || '',
+        number: row.number || '',
+        isPrimary: !!row.is_primary
+    }));
 };
 
 // ============================================

@@ -51,7 +51,7 @@ import {
     LogOut
 } from 'lucide-react';
 import { INITIAL_DATA } from './constants';
-import { AsoEntry, FilterState, Granularity } from './types';
+import { AsoEntry, AppAlias, FilterState, Granularity } from './types';
 import { translations } from './i18n';
 import { DashboardCharts } from './components/DashboardCharts';
 import { DataUploadModal } from './components/DataUploadModal';
@@ -64,9 +64,10 @@ import { KeywordSuggester } from './components/KeywordSuggester';
 import { supabase } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
-import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, deleteAsoEntriesForApp, deleteAsoEntriesForAppName } from './lib/supabaseService';
+import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, deleteAsoEntriesForApp, deleteAsoEntriesForAppName, loadAppAliases, saveAppAliasesForApp } from './lib/supabaseService';
 import { fetchSheetData, processSheetData } from './services/googleSheets';
 import { BalancePanel } from './components/BalancePanel';
+import { AppAliasManager } from './components/AppAliasManager';
 
 const VIEW_MODE_COOKIE = 'zeyf_view_mode';
 
@@ -161,14 +162,18 @@ const App = () => {
         const loadInitialData = async () => {
             setDataLoading(true);
             try {
-                const [asoData, appSettings, userPrefs, hasSyncConfig, isExistingUser, syncResult] = await Promise.all([
+                const [asoDataRaw, appSettings, userPrefs, hasSyncConfig, isExistingUser, syncResult, aliases] = await Promise.all([
                     loadAsoData(),
                     loadAppSettings(),
                     loadUserPreferences(),
                     checkGoogleSheetsSyncExists(),
                     checkIsExistingUser(),
-                    supabase.from('google_sheets_sync').select('last_synced_at').eq('user_id', userId).maybeSingle()
+                    supabase.from('google_sheets_sync').select('last_synced_at').eq('user_id', userId).maybeSingle(),
+                    loadAppAliases()
                 ]);
+
+                const testAppNames = new Set(['SecretBen', 'FitnessPro']);
+                const asoData = asoDataRaw.filter(d => !testAppNames.has(d.appName));
 
                 // Update sync state
                 if (syncResult.data) {
@@ -202,6 +207,12 @@ const App = () => {
                 setLang(userPrefs.lang);
                 setTheme(userPrefs.theme);
                 setIsSyncConfigured(hasSyncConfig);
+                const groupedAliases = aliases.reduce<Record<string, AppAlias[]>>((acc, alias) => {
+                    if (!acc[alias.appName]) acc[alias.appName] = [];
+                    acc[alias.appName].push(alias);
+                    return acc;
+                }, {});
+                setAppAliases(groupedAliases);
 
                 hasLoadedData.current = true;
                 currentUserId.current = userId;
@@ -334,14 +345,51 @@ const App = () => {
     const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
     const [deleteAllConfirmation, setDeleteAllConfirmation] = useState(false);
     const [viewMode, setViewMode] = useState<'full' | 'mini' | 'combined'>(() => readViewModeCookie());
+    const [appAliases, setAppAliases] = useState<Record<string, AppAlias[]>>({});
+    const defaultAliasPrefix = useMemo(() => {
+        const counts: Record<string, number> = {};
+        (Object.values(appAliases) as AppAlias[][]).forEach(list => {
+            list.forEach(alias => {
+                if (alias.prefix) {
+                    counts[alias.prefix] = (counts[alias.prefix] || 0) + 1;
+                }
+            });
+        });
+        let best: string | null = null;
+        let bestCount = 0;
+        Object.entries(counts).forEach(([prefix, count]) => {
+            if (count > bestCount) {
+                best = prefix;
+                bestCount = count;
+            }
+        });
+        return best;
+    }, [appAliases]);
     const [tickleCount, setTickleCount] = useState(0);
     const [isTickling, setIsTickling] = useState(false);
     const [tickleMsg, setTickleMsg] = useState<string | null>(null);
     const tickleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    const formatAliasLabel = (alias?: AppAlias | null) => {
+        if (!alias || (!alias.prefix && !alias.number)) return null;
+        if (alias.prefix && alias.number) return `${alias.prefix}-${alias.number}`;
+        return alias.prefix || alias.number;
+    };
+
     useEffect(() => {
         persistViewModeCookie(viewMode);
     }, [viewMode]);
+
+    const handleSaveAliases = async (appName: string, rows: { appId: string; prefix: string; number: string; isPrimary: boolean }[]) => {
+        const cleaned = rows.map(r => ({
+            appId: r.appId,
+            prefix: (r.prefix || '').toUpperCase().slice(0, 2),
+            number: (r.number || '').slice(0, 6),
+            isPrimary: r.isPrimary
+        }));
+        const saved = await saveAppAliasesForApp(appName, cleaned);
+        setAppAliases(prev => ({ ...prev, [appName]: saved }));
+    };
 
     // UI State for Moving Apps
     const [movingApp, setMovingApp] = useState<string | null>(null); // The app currently being moved
@@ -1498,38 +1546,48 @@ const App = () => {
                                                 {t.empty}
                                             </div>
                                         )}
-                                        {apps.map(app => (
-                                            <div
-                                                key={app}
-                                                onClick={() => handleAppSelect(app)}
-                                                className={`group relative w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${filters.appName === app && currentPage === 'dashboard'
-                                                    ? 'bg-slate-800 text-white shadow-md'
-                                                    : 'hover:bg-slate-800/50 hover:text-white'
-                                                    }`}
-                                            >
-                                                <div className="flex items-center gap-3 overflow-hidden flex-1">
+                                        {apps.map(app => {
+                                            const primaryAlias = appAliases[app]?.find(a => a.isPrimary && (a.prefix || a.number));
+                                            const aliasLabel = formatAliasLabel(primaryAlias);
+                                            return (
+                                                <div
+                                                    key={app}
+                                                    onClick={() => handleAppSelect(app)}
+                                                    className={`group relative w-full flex items-center justify-between pl-2 pr-1 py-2 rounded-lg text-sm transition-colors cursor-pointer ${filters.appName === app && currentPage === 'dashboard'
+                                                        ? 'bg-slate-800 text-white shadow-md'
+                                                        : 'hover:bg-slate-800/50 hover:text-white'
+                                                        }`}
+                                                >
+                                                <div className="flex items-center gap-1.5 overflow-hidden flex-1">
                                                     {/* Icon or Dot */}
                                                     {appIcons[app] ? (
                                                         <img src={appIcons[app]} alt="" loading="eager" className="w-5 h-5 rounded-md object-cover shrink-0 bg-white" />
                                                     ) : (
                                                         <div className={`w-2 h-2 rounded-full shrink-0 ${filters.appName === app && currentPage === 'dashboard' ? 'bg-indigo-500' : 'bg-slate-600'}`} />
                                                     )}
-                                                    <span className="truncate font-medium">{app}</span>
+                                                    <div className="flex items-center gap-1 min-w-0">
+                                                        {aliasLabel && (
+                                                            <span className="shrink-0 text-[10px] font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 rounded-md px-1 py-[2px] leading-none">
+                                                                [{aliasLabel}]
+                                                            </span>
+                                                        )}
+                                                        <span className="truncate font-medium">{app}</span>
+                                                    </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pr-0.5">
                                                     {/* Move Folder Dropdown Trigger */}
                                                     <div className="relative">
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); setMovingApp(movingApp === app ? null : app); }}
-                                                            className={`p-1.5 rounded-md transition-colors ${movingApp === app ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-400 hover:text-white'}`}
+                                                            className={`p-1 rounded-md transition-colors ${movingApp === app ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-400 hover:text-white'}`}
                                                             title="Move to Folder"
                                                         >
                                                             <Folder size={14} />
                                                         </button>
 
                                                         {movingApp === app && (
-                                                            <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-xl z-50 py-1 border border-slate-200 animate-in fade-in zoom-in-95 duration-100 dark:bg-slate-800 dark:border-slate-700">
+                                                            <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-xl z-50 py-1 border border-slate-200 animate-in fade-in zoom-in-95 duration-100 dark:bg-slate-800 dark:border-slate-700">
                                                                 <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase border-b border-slate-100 dark:border-slate-700">Move to...</div>
                                                                 {categories.filter(c => c !== category).map(c => (
                                                                     <button
@@ -1547,6 +1605,14 @@ const App = () => {
                                                                 >
                                                                     <Layout size={12} /> {t.uncategorized}
                                                                 </button>
+                                                                <div className="border-t border-slate-100 dark:border-slate-700 mt-1 pt-1">
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleToggleArchive(e, app); }}
+                                                                        className="w-full text-left px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md flex items-center gap-2"
+                                                                    >
+                                                                        <Archive size={12} /> Archive App
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         )}
                                                         {/* Overlay to close dropdown if clicking outside */}
@@ -1555,97 +1621,104 @@ const App = () => {
                                                         )}
                                                     </div>
 
-                                                    <button
-                                                        onClick={(e) => handleToggleArchive(e, app)}
-                                                        className="p-1.5 hover:bg-slate-700 text-slate-400 hover:text-white rounded-md transition-all"
-                                                        title="Archive App"
-                                                    >
-                                                        <Archive size={14} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-
-                    {/* Uncategorized Apps */}
-                    {groupedApps['Uncategorized'].length > 0 && (
-                        <div className="mb-4">
-                            <div
-                                className="px-3 mb-1 text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 cursor-pointer hover:text-slate-300 transition-colors"
-                                onClick={() => toggleCategoryCollapse('Uncategorized')}
-                            >
-                                {collapsedCategories.includes('Uncategorized') ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                                <span className="truncate">{t.uncategorized}</span>
-                            </div>
-
-                            {!collapsedCategories.includes('Uncategorized') && (
-                                <div className="space-y-1 animate-in slide-in-from-top-1 fade-in duration-200">
-                                    {groupedApps['Uncategorized'].map(app => (
-                                        <div
-                                            key={app}
-                                            onClick={() => handleAppSelect(app)}
-                                            className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${filters.appName === app && currentPage === 'dashboard'
-                                                ? 'bg-slate-800 text-white shadow-md'
-                                                : 'hover:bg-slate-800/50 hover:text-white'
-                                                }`}
-                                        >
-                                            <div className="flex items-center gap-3 overflow-hidden flex-1">
-                                                {appIcons[app] ? (
-                                                    <img src={appIcons[app]} alt="" loading="eager" className="w-5 h-5 rounded-md object-cover shrink-0 bg-white" />
-                                                ) : (
-                                                    <div className={`w-2 h-2 rounded-full shrink-0 ${filters.appName === app && currentPage === 'dashboard' ? 'bg-indigo-500' : 'bg-slate-600'}`} />
-                                                )}
-                                                <span className="truncate font-medium">{app}</span>
-                                            </div>
-
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                {/* Move Logic for Uncategorized */}
-                                                <div className="relative">
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setMovingApp(movingApp === app ? null : app); }}
-                                                        className={`p-1.5 rounded-md transition-colors ${movingApp === app ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-400 hover:text-white'}`}
-                                                        title="Move to Folder"
-                                                    >
-                                                        <FolderPlus size={14} />
-                                                    </button>
-
-                                                    {movingApp === app && (
-                                                        <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-xl z-50 py-1 border border-slate-200 animate-in fade-in zoom-in-95 duration-100 dark:bg-slate-800 dark:border-slate-700">
-                                                            <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase border-b border-slate-100 dark:border-slate-700">Move to...</div>
-                                                            {categories.map(c => (
-                                                                <button
-                                                                    key={c}
-                                                                    onClick={(e) => { e.stopPropagation(); handleMoveApp(app, c); }}
-                                                                    className="w-full text-left px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:text-indigo-600 flex items-center gap-2"
-                                                                >
-                                                                    <Folder size={12} /> {c}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                    {movingApp === app && (
-                                                        <div className="fixed inset-0 z-40 cursor-default" onClick={(e) => { e.stopPropagation(); setMovingApp(null); }} />
-                                                    )}
-                                                </div>
-
-                                                <button
-                                                    onClick={(e) => handleToggleArchive(e, app)}
-                                                    className="p-1.5 hover:bg-slate-700 text-slate-400 hover:text-white rounded-md transition-all"
-                                                    title="Archive App"
-                                                >
-                                                    <Archive size={14} />
-                                                </button>
-                                            </div>
                                         </div>
-                                    ))}
+                                    </div>
+                                );
+                            })}
                                 </div>
                             )}
                         </div>
-                    )}
+                    );
+                })}
+
+                {/* Uncategorized Apps */}
+                {groupedApps['Uncategorized'].length > 0 && (
+                    <div className="mb-4">
+                        <div
+                            className="px-3 mb-1 text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 cursor-pointer hover:text-slate-300 transition-colors"
+                            onClick={() => toggleCategoryCollapse('Uncategorized')}
+                        >
+                            {collapsedCategories.includes('Uncategorized') ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                            <span className="truncate">{t.uncategorized}</span>
+                        </div>
+
+                        {!collapsedCategories.includes('Uncategorized') && (
+                            <div className="space-y-1 animate-in slide-in-from-top-1 fade-in duration-200">
+                                {groupedApps['Uncategorized'].map(app => (
+                                    (() => {
+                                        const primaryAlias = appAliases[app]?.find(a => a.isPrimary && (a.prefix || a.number));
+                                        const aliasLabel = formatAliasLabel(primaryAlias);
+                                        return (
+                                    <div
+                                        key={app}
+                                        onClick={() => handleAppSelect(app)}
+                                        className={`group w-full flex items-center justify-between pl-2 pr-1 py-2 rounded-lg text-sm transition-colors cursor-pointer ${filters.appName === app && currentPage === 'dashboard'
+                                            ? 'bg-slate-800 text-white shadow-md'
+                                            : 'hover:bg-slate-800/50 hover:text-white'
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-1.5 overflow-hidden flex-1">
+                                            {appIcons[app] ? (
+                                                <img src={appIcons[app]} alt="" loading="eager" className="w-5 h-5 rounded-md object-cover shrink-0 bg-white" />
+                                            ) : (
+                                                <div className={`w-2 h-2 rounded-full shrink-0 ${filters.appName === app && currentPage === 'dashboard' ? 'bg-indigo-500' : 'bg-slate-600'}`} />
+                                            )}
+                                            <div className="flex items-center gap-1 min-w-0">
+                                                {aliasLabel && (
+                                                    <span className="shrink-0 text-[10px] font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 rounded-md px-1 py-[2px] leading-none">
+                                                        [{aliasLabel}]
+                                                    </span>
+                                                )}
+                                                <span className="truncate font-medium">{app}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pr-0.5">
+                                            {/* Move Logic for Uncategorized */}
+                                            <div className="relative">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setMovingApp(movingApp === app ? null : app); }}
+                                                    className={`p-1 rounded-md transition-colors ${movingApp === app ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-400 hover:text-white'}`}
+                                                    title="Move to Folder"
+                                                >
+                                                    <FolderPlus size={14} />
+                                                </button>
+
+                                                {movingApp === app && (
+                                                    <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-xl z-50 py-1 border border-slate-200 animate-in fade-in zoom-in-95 duration-100 dark:bg-slate-800 dark:border-slate-700">
+                                                        <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase border-b border-slate-100 dark:border-slate-700">Move to...</div>
+                                                        {categories.map(c => (
+                                                            <button
+                                                                key={c}
+                                                                onClick={(e) => { e.stopPropagation(); handleMoveApp(app, c); }}
+                                                                className="w-full text-left px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:text-indigo-600 flex items-center gap-2"
+                                                            >
+                                                                <Folder size={12} /> {c}
+                                                            </button>
+                                                        ))}
+                                                        <div className="border-t border-slate-100 dark:border-slate-700 mt-1 pt-1">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleToggleArchive(e, app); }}
+                                                                className="w-full text-left px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md flex items-center gap-2"
+                                                            >
+                                                                <Archive size={12} /> Archive App
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {movingApp === app && (
+                                                    <div className="fixed inset-0 z-40 cursor-default" onClick={(e) => { e.stopPropagation(); setMovingApp(null); }} />
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                        );
+                                    })()
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 </div>
 
@@ -1678,7 +1751,14 @@ const App = () => {
                                                 ) : (
                                                     <Archive size={12} className="shrink-0" />
                                                 )}
-                                                <span className="truncate">{app}</span>
+                                                <div className="flex items-center gap-1 min-w-0">
+                                                    {appAliases[app]?.find(a => a.isPrimary && (a.prefix || a.number)) && (
+                                                        <span className="shrink-0 text-[11px] font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 rounded-md px-1.5 py-0.5 leading-none">
+                                                            [{`${appAliases[app].find(a => a.isPrimary && (a.prefix || a.number))!.prefix || 'AA'}-${appAliases[app].find(a => a.isPrimary && (a.prefix || a.number))!.number || '000'}`}]
+                                                        </span>
+                                                    )}
+                                                    <span className="truncate">{app}</span>
+                                                </div>
                                             </div>
 
                                             <button
@@ -1827,7 +1907,19 @@ const App = () => {
                                                     className="w-8 h-8 md:w-10 md:h-10 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm object-cover shrink-0"
                                                 />
                                             )}
-                                            <span className="truncate">{filters.appName || t.dashboard}</span>
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                {(() => {
+                                                    const primaryAlias = filters.appName ? appAliases[filters.appName]?.find(a => a.isPrimary && (a.prefix || a.number)) : null;
+                                                    const aliasLabel = formatAliasLabel(primaryAlias);
+                                                    if (!aliasLabel) return null;
+                                                    return (
+                                                        <span className="shrink-0 inline-flex items-center justify-center h-6 px-2 rounded-md text-xs font-semibold text-indigo-200 bg-indigo-500/20 border border-indigo-500/30">
+                                                            [{aliasLabel}]
+                                                        </span>
+                                                    );
+                                                })()}
+                                                <span className="truncate">{filters.appName || t.dashboard}</span>
+                                            </div>
                                         </h1>
 
                                         {/* App Store Link Section - Hidden on very small screens if needed, or kept compact */}
@@ -2259,6 +2351,18 @@ const App = () => {
                                                 </button>
                                             </div>
                                         </div>
+                                        {filters.appName && availableAppIds.length > 0 && (
+                                            <div className="col-span-1">
+                                                <AppAliasManager
+                                                    appName={filters.appName}
+                                                    appIds={availableAppIds}
+                                                    aliases={appAliases[filters.appName] || []}
+                                                    onSave={(rows) => handleSaveAliases(filters.appName!, rows)}
+                                                    suggestedPrefix={defaultAliasPrefix}
+                                                    t={t}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

@@ -57,7 +57,15 @@ export interface ComparisonBlock {
   endDate: string | null;
 }
 
+export interface AppAlias {
+  id?: string;
+  appName: string;
+  appId: string;
+  prefix: string;
+  number: string;
+  isPrimary: boolean;
+}
+
 // Translation type - derived from i18n.ts structure
 import { translations } from './i18n';
 export type Translations = typeof translations.en;
-

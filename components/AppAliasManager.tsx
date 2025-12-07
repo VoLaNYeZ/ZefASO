@@ -1,0 +1,176 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { Check, Info, Save, Star } from 'lucide-react';
+import { AppAlias } from '../types';
+
+interface AppAliasManagerProps {
+    appName: string;
+    appIds: string[];
+    aliases: AppAlias[];
+    onSave: (aliases: { appId: string; prefix: string; number: string; isPrimary: boolean }[]) => Promise<void>;
+    suggestedPrefix?: string | null;
+    t: any;
+}
+
+interface AliasRow {
+    appId: string;
+    prefix: string;
+    number: string;
+    isPrimary: boolean;
+}
+
+export const AppAliasManager: React.FC<AppAliasManagerProps> = ({ appName, appIds, aliases, onSave, suggestedPrefix, t }) => {
+    const [rows, setRows] = useState<AliasRow[]>([]);
+    const [saving, setSaving] = useState(false);
+    const [success, setSuccess] = useState(false);
+
+    useEffect(() => {
+        const byId = new Map(aliases.map(a => [a.appId, a]));
+        const initialRows = appIds.map(id => {
+            const existing = byId.get(id);
+            return {
+                appId: id,
+                prefix: existing?.prefix || '',
+                number: existing?.number || '',
+                isPrimary: !!existing?.isPrimary
+            };
+        });
+        if (suggestedPrefix) {
+            initialRows.forEach(r => {
+                if (!r.prefix) r.prefix = suggestedPrefix;
+            });
+        }
+        setRows(initialRows);
+        setSuccess(false);
+    }, [appIds, aliases, suggestedPrefix]);
+
+    const handlePrefixChange = (appId: string, value: string) => {
+        const clean = value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2);
+        setRows(prev => prev.map(r => r.appId === appId ? { ...r, prefix: clean } : r));
+    };
+
+    const handleNumberChange = (appId: string, value: string) => {
+        const clean = value.replace(/[^0-9]/g, '').slice(0, 4);
+        setRows(prev => prev.map(r => r.appId === appId ? { ...r, number: clean } : r));
+    };
+
+    const handlePrimary = (appId: string) => {
+        setRows(prev => {
+            const next = prev.map(r => ({ ...r }));
+            const target = next.find(r => r.appId === appId);
+            if (!target) return prev;
+            const isCurrentlyPrimary = target.isPrimary;
+            // Toggle off if already primary, otherwise set as the only primary
+            if (isCurrentlyPrimary) {
+                target.isPrimary = false;
+            } else {
+                next.forEach(r => (r.isPrimary = r.appId === appId));
+            }
+            return next;
+        });
+    };
+
+    const save = async () => {
+        setSaving(true);
+        setSuccess(false);
+        try {
+            await onSave(rows);
+            setSuccess(true);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const primaryHint = useMemo(() => rows.find(r => r.isPrimary), [rows]);
+    const formatLabel = (alias?: AliasRow) => {
+        if (!alias || (!alias.prefix && !alias.number)) return null;
+        if (alias.prefix && alias.number) return `${alias.prefix}-${alias.number}`;
+        return alias.prefix || alias.number;
+    };
+
+    return (
+        <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                    <h5 className="text-sm font-bold text-slate-800 dark:text-slate-100">{t.aliases}</h5>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.aliasDescription}</p>
+                </div>
+                {success && (
+                    <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold">
+                        <Check size={14} /> {t.aliasSaved}
+                    </span>
+                )}
+            </div>
+
+            <div className="space-y-2">
+                {rows.map(row => (
+                    <div
+                        key={row.appId}
+                        className="grid grid-cols-[minmax(0,1.6fr)_auto_auto_auto] items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700 min-h-[62px]"
+                    >
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-[11px] uppercase font-semibold text-slate-500 dark:text-slate-400">App ID</span>
+                            <span className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{appName} ({row.appId})</span>
+                        </div>
+
+                        <div className="flex flex-col items-start gap-1">
+                            <span className="text-[11px] uppercase font-semibold text-slate-500 dark:text-slate-400">Abbr</span>
+                            <input
+                                value={row.prefix}
+                                onChange={(e) => handlePrefixChange(row.appId, e.target.value)}
+                                maxLength={2}
+                                placeholder={suggestedPrefix || 'Abbr'}
+                                className="w-16 px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none"
+                            />
+                        </div>
+
+                        <div className="flex flex-col items-start gap-1">
+                            <span className="text-[11px] uppercase font-semibold text-slate-500 dark:text-slate-400">{t.aliasNumber}</span>
+                            <input
+                                value={row.number}
+                                onChange={(e) => handleNumberChange(row.appId, e.target.value)}
+                                inputMode="numeric"
+                                maxLength={4}
+                                placeholder="#"
+                                className="w-16 px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none"
+                            />
+                        </div>
+
+                        <div className="flex flex-col items-end justify-center gap-1">
+                            <span className="text-[11px] uppercase font-semibold text-slate-500 dark:text-slate-400">{t.aliasPrimary}</span>
+                            <button
+                                onClick={() => handlePrimary(row.appId)}
+                                className={`w-10 h-10 rounded-lg border text-xs font-semibold transition-colors flex items-center justify-center ${
+                                    row.isPrimary
+                                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                                }`}
+                                title={t.aliasPrimary}
+                            >
+                                <Star size={14} fill={row.isPrimary ? 'currentColor' : 'none'} />
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <div className="flex items-center justify-between mt-3">
+                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <Info size={14} />
+                    <span>
+                        {primaryHint && formatLabel(primaryHint)
+                            ? `${t.aliasPrimary}: [${formatLabel(primaryHint)}]`
+                            : t.aliasPrimary}
+                    </span>
+                </div>
+                <button
+                    onClick={save}
+                    disabled={saving}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold shadow-sm hover:bg-indigo-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                    <Save size={16} />
+                    {saving ? `${t.aliasSave}...` : t.aliasSave}
+                </button>
+            </div>
+        </div>
+    );
+};
