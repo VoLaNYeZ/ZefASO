@@ -104,6 +104,14 @@ const normalizeGeoCode = (geo: string): string => {
     return upper.substring(0, 2);
 };
 
+// Safely parse a number out of a cell (handles stray chars, commas, apostrophes)
+const parseNumeric = (raw: string): number | null => {
+    const cleaned = raw.replace(/[^\d-]/g, '');
+    if (!cleaned) return null;
+    const parsed = parseInt(cleaned, 10);
+    return isNaN(parsed) ? null : parsed;
+};
+
 export const processSheetData = (rows: any[][], tabName: string): AsoEntry[] => {
     const newEntries: AsoEntry[] = [];
 
@@ -191,13 +199,13 @@ export const processSheetData = (rows: any[][], tabName: string): AsoEntry[] => 
 
         let ranking = 0;
         if (!rankingRaw.toLowerCase().includes('no') && rankingRaw !== '') {
-            const parsed = parseInt(rankingRaw);
-            if (!isNaN(parsed)) ranking = parsed;
+            const parsed = parseNumeric(rankingRaw);
+            if (parsed !== null) ranking = parsed;
         }
 
-        const installs = parseInt(installsRaw);
+        const installsParsed = parseNumeric(installsRaw);
 
-        if (date && !isNaN(installs)) {
+        if (date && installsParsed !== null) {
             const normalizedId = (() => {
                 if (/^\d+$/.test(csvIdRaw)) return csvIdRaw;
                 const cleaned = csvIdRaw.replace(/[^\dA-Za-z_-]/g, '');
@@ -213,7 +221,7 @@ export const processSheetData = (rows: any[][], tabName: string): AsoEntry[] => 
                 appId: normalizedId,
                 keyword: keyword,
                 ranking: ranking,
-                installs: installs,
+                installs: installsParsed,
                 cpi: cpiRaw ? parseFloat(cpiRaw) : DEFAULT_CPI
             };
             newEntries.push(entry);

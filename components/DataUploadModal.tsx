@@ -297,6 +297,13 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
         return tokens;
     };
 
+    const parseNumeric = (val: string): number | null => {
+        const cleaned = val.replace(/[^\d-]/g, '');
+        if (!cleaned) return null;
+        const parsed = parseInt(cleaned, 10);
+        return isNaN(parsed) ? null : parsed;
+    };
+
     const parseAndSubmit = (text: string, forcedAppName?: string) => {
         const lines = text.trim().split('\n');
         const newEntries: AsoEntry[] = [];
@@ -345,7 +352,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                     if (!isNaN(parsed)) ranking = parsed;
                 }
 
-                const installs = parseInt(cols[7]);
+                const installs = parseNumeric(cols[7]) ?? NaN;
                 const date = parseDate(dateRaw);
 
                 // Basic sanity check
