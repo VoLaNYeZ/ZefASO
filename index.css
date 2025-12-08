@@ -39,6 +39,31 @@ body {
   background: #64748b;
 }
 
+/* Overview desktop tweaks */
+.overview-filter {
+  min-width: 170px;
+  max-width: 220px;
+}
+
+.overview-date {
+  min-width: 200px;
+  max-width: 240px;
+}
+
+@media (max-width: 1523px) {
+  .overview-filter {
+    min-width: 130px;
+    max-width: 180px;
+  }
+  .overview-date {
+    min-width: 170px;
+    max-width: 210px;
+  }
+  .overview-desc {
+    display: none;
+  }
+}
+
 /* ============================================ */
 /* Premium Login Background Animations         */
 /* ============================================ */

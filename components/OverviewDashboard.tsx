@@ -69,6 +69,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     theme,
     t
 }) => {
+    const STORAGE_KEY = 'overview_filters_v1';
+
     // -- Helpers --
     const toLocalStr = (date: Date) => {
         const y = date.getFullYear();
@@ -77,22 +79,59 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         return `${y}-${m}-${d}`;
     };
 
+    const getStoredOverviewFilters = () => {
+        if (typeof window === 'undefined') return null;
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            const todayStr = toLocalStr(new Date());
+            if (parsed.savedAt !== todayStr) return null;
+            return parsed as {
+                startDate?: string | null;
+                endDate?: string | null;
+                selectedCategory?: string;
+                selectedApp?: string;
+            };
+        } catch {
+            return null;
+        }
+    };
+
     // -- State --
     // Default to last 30 days
     const [startDate, setStartDate] = useState<string | null>(() => {
+        const stored = getStoredOverviewFilters();
+        if (stored?.startDate) return stored.startDate;
         const d = new Date();
         d.setDate(d.getDate() - 30);
         return toLocalStr(d);
     });
     const [endDate, setEndDate] = useState<string | null>(
-        toLocalStr(new Date())
+        () => getStoredOverviewFilters()?.endDate || toLocalStr(new Date())
     );
-    const [selectedCategory, setSelectedCategory] = useState<string>('All');
-    const [selectedApp, setSelectedApp] = useState<string>('All');
+    const [selectedCategory, setSelectedCategory] = useState<string>(() => getStoredOverviewFilters()?.selectedCategory || 'All');
+    const [selectedApp, setSelectedApp] = useState<string>(() => getStoredOverviewFilters()?.selectedApp || 'All');
     const [overviewMode, setOverviewMode] = useState<OverviewMode>(() => {
         const saved = localStorage.getItem('zeyfaso_overview_mode');
         return (saved === 'keyword' || saved === 'geo') ? saved : 'keyword';
     });
+
+    // Persist desktop overview filters for same-day revisits
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const todayStr = toLocalStr(new Date());
+        localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+                startDate,
+                endDate,
+                selectedCategory,
+                selectedApp,
+                savedAt: todayStr
+            })
+        );
+    }, [startDate, endDate, selectedCategory, selectedApp]);
 
     // Save overview mode preference
     useEffect(() => {
@@ -332,9 +371,14 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                         <div className="p-2 bg-gradient-to-br from-fuchsia-500 to-pink-500 rounded-lg">
                             <LayoutGrid size={24} className="text-white" />
                         </div>
-                        <h2 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">{t.overview}</h2>
+                        <h2
+                            title={t.overviewDescription}
+                            className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight"
+                        >
+                            {t.overview}
+                        </h2>
                     </div>
-                    <p className="text-slate-500 dark:text-slate-400 font-medium">{t.overviewDescription}</p>
+                    <p className="overview-desc text-slate-500 dark:text-slate-400 font-medium">{t.overviewDescription}</p>
                 </div>
 
                 <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm w-full xl:w-auto">
@@ -424,7 +468,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                 <select
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm rounded-lg pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                    className="overview-filter appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm rounded-lg pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors w-auto"
                                 >
                                     <option value="All">All Categories</option>
                                     <option value="Uncategorized">{t.uncategorized}</option>
@@ -436,7 +480,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                 <select
                                     value={selectedApp}
                                     onChange={(e) => setSelectedApp(e.target.value)}
-                                    className="appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm rounded-lg pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                    className="overview-filter appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm rounded-lg pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors w-auto"
                                 >
                                     <option value="All">All Apps</option>
                                     {availableApps.map(app => <option key={app} value={app}>{app}</option>)}
@@ -486,7 +530,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                     {t.today || 'Today'}
                                 </button>
                             </div>
-                            <div className="min-w-[180px] flex-shrink-0">
+                            <div className="overview-date min-w-[180px] flex-shrink-0">
                                 <DateRangePicker
                                     startDate={startDate}
                                     endDate={endDate}
