@@ -305,6 +305,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
     };
 
     const parseAndSubmit = (text: string, forcedAppName?: string) => {
+        const safeLower = (val: string | undefined) => (val || '').toLocaleLowerCase();
         const lines = text.trim().split('\n');
         const newEntries: AsoEntry[] = [];
         let skippedCount = 0;
@@ -314,7 +315,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
 
         lines.forEach((line, index) => {
             // Determine separator: usually tab from Sheets/Excel, or comma from CSV
-            const cols = parseLine(line).map(c => c.replace(/^"|"$/g, ''));
+            const cols = parseLine(line).map(c => c.replace(/^"|"$/g, '').normalize('NFC'));
 
             // Skip empty lines or lines with just separators
             if (!line.trim() || cols.every(c => !c)) {
@@ -324,7 +325,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
             // Expected: Date | App Name | GEO | ID | Keyword | Last Plan | Ranking | Installs | [CPI]
 
             // Check if it's a header row
-            if (index === 0 && (cols[0].toLowerCase().includes('date') || cols[1].toLowerCase().includes('app'))) {
+            if (index === 0 && (safeLower(cols[0]).includes('date') || safeLower(cols[1]).includes('app'))) {
                 return;
             }
 
