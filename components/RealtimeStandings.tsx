@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { RefreshCw, Clock, AlertCircle, CheckCircle2, Trophy, Eye, Activity } from 'lucide-react';
 import { fetchAppRank, fetchTop5Apps, Top5App } from '../lib/itunesService';
-import { loadRealtimeRankings, saveRealtimeRanking, RealtimeRanking, getApiUsage, incrementApiUsage, fetchCountryRankings, CountryRanking } from '../lib/supabaseService';
+import { loadRealtimeRankings, saveRealtimeRanking, RealtimeRanking, getGlobalApiUsage, incrementGlobalApiUsage, fetchCountryRankings, CountryRanking } from '../lib/supabaseService';
 import { fetchTrafficData, TrafficData } from '../services/asoMobile';
 import { TrafficTooltip } from './TrafficTooltip';
 import { ConfirmationPopover } from './ConfirmationPopover';
@@ -26,6 +26,8 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
     theme,
     translations
 }) => {
+    const t = translations || {};
+    const TRAFFIC_REQUEST_LIMIT = 550;
     const [rankings, setRankings] = useState<Record<string, RealtimeRanking>>({});
     const [loadingState, setLoadingState] = useState<Record<string, boolean>>({});
     const [trafficLoadingState, setTrafficLoadingState] = useState<Record<string, boolean>>({});
@@ -56,6 +58,10 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
         loadData();
         loadApiUsage();
         loadCountryRankings();
+        const timer = setInterval(() => {
+            loadApiUsage();
+        }, 20000);
+        return () => clearInterval(timer);
     }, [appId]);
 
     // Map common country code variations to standard ISO codes
@@ -76,7 +82,7 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
     };
 
     const loadApiUsage = async () => {
-        const count = await getApiUsage('aso_mobile');
+        const count = await getGlobalApiUsage('aso_mobile');
         setApiUsageCount(count);
     };
 
@@ -99,19 +105,24 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
             // Fetch from iTunes
             const rank = await fetchAppRank(keyword, geo, appId);
 
-            // Save to Supabase
+            const currentRanking = rankings[key];
             const newRanking: RealtimeRanking = {
-                appId,
-                keyword,
-                geo,
+                ...(currentRanking || {
+                    appId,
+                    keyword,
+                    geo,
+                    rank: null,
+                    lastUpdated: new Date().toISOString()
+                }),
                 rank,
                 lastUpdated: new Date().toISOString()
             };
 
-            await saveRealtimeRanking(newRanking);
-
-            // Update local state
+            // Optimistic update - do not block UI on Supabase write
             setRankings(prev => ({ ...prev, [key]: newRanking }));
+            saveRealtimeRanking(newRanking).catch((err) => {
+                console.warn('Failed to save realtime ranking update:', err);
+            });
         } catch (error) {
             console.error(`Failed to refresh ${keyword} in ${geo}`, error);
         } finally {
@@ -130,24 +141,33 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
             const trafficData = await fetchTrafficData(keyword, geo);
 
             // Increment usage
-            const newCount = await incrementApiUsage('aso_mobile');
+            const newCount = await incrementGlobalApiUsage('aso_mobile');
             setApiUsageCount(newCount);
 
-            // Update Supabase
             const currentRanking = rankings[key];
-            if (currentRanking) {
-                const updatedRanking: RealtimeRanking = {
-                    ...currentRanking,
-                    traffic: trafficData.traffic?.value,
-                    trafficData: trafficData
-                };
+            const updatedRanking: RealtimeRanking = {
+                ...(currentRanking || {
+                    appId,
+                    keyword,
+                    geo,
+                    rank: null,
+                    lastUpdated: new Date().toISOString()
+                }),
+                traffic: trafficData.traffic?.value,
+                trafficData: trafficData,
+                lastUpdated: new Date().toISOString()
+            };
 
-                await saveRealtimeRanking(updatedRanking);
-                setRankings(prev => ({ ...prev, [key]: updatedRanking }));
-            }
+            // Optimistic update - do not block UI on Supabase write
+            setRankings(prev => ({ ...prev, [key]: updatedRanking }));
+            saveRealtimeRanking(updatedRanking).catch((err) => {
+                console.warn('Failed to save realtime ranking traffic update:', err);
+            });
         } catch (error: any) {
             console.error(`Failed to fetch traffic for ${keyword} in ${geo}`, error);
-            alert(`Failed to fetch traffic data: ${error.message || 'Unknown error'}`);
+            const base = t.fetchTrafficFailed || 'Failed to fetch traffic data';
+            const suffix = error?.message ? `: ${error.message}` : '';
+            alert(`${base}${suffix}`);
         } finally {
             setTrafficLoadingState(prev => ({ ...prev, [key]: false }));
         }
@@ -426,9 +446,10 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
                 isOpen={popoverState.isOpen}
                 onClose={() => setPopoverState(prev => ({ ...prev, isOpen: false }))}
                 onConfirm={handleTrafficFetchConfirm}
-                message="Fetch traffic data?"
-                subMessage={`Requests left: ${Math.max(0, 50 - apiUsageCount)}`}
-                confirmText="Fetch"
+                message={t.fetchTrafficConfirm || 'Fetch traffic data?'}
+                subMessage={`${t.requestsLeft || 'Requests left'}: ${Math.max(0, TRAFFIC_REQUEST_LIMIT - apiUsageCount)}`}
+                confirmText={t.fetchTraffic || 'Fetch'}
+                cancelText={t.cancel || 'Cancel'}
                 targetRef={popoverState.targetRef as React.RefObject<HTMLElement>}
             />
         </div>

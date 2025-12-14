@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 interface ConfirmationPopoverProps {
     isOpen: boolean;
@@ -24,15 +24,39 @@ export const ConfirmationPopover: React.FC<ConfirmationPopoverProps> = ({
     const popoverRef = useRef<HTMLDivElement>(null);
     const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
+    const updatePosition = () => {
+        const el = targetRef.current;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        setPosition({
+            // Popover uses `position: fixed`, so we must use viewport coords (no scroll offsets)
+            top: rect.bottom + 8,
+            left: rect.left + rect.width / 2
+        });
+    };
+
+    useLayoutEffect(() => {
+        if (!isOpen) return;
+        updatePosition();
+    }, [isOpen]);
+
     useEffect(() => {
-        if (isOpen && targetRef.current) {
-            const rect = targetRef.current.getBoundingClientRect();
-            setPosition({
-                top: rect.bottom + window.scrollY + 8,
-                left: rect.left + window.scrollX + rect.width / 2
-            });
-        }
-    }, [isOpen, targetRef]);
+        if (!isOpen) return;
+        let raf = 0;
+        const schedule = () => {
+            cancelAnimationFrame(raf);
+            raf = requestAnimationFrame(() => updatePosition());
+        };
+
+        // Capture scroll events from nested scroll containers too
+        window.addEventListener('scroll', schedule, true);
+        window.addEventListener('resize', schedule);
+        return () => {
+            cancelAnimationFrame(raf);
+            window.removeEventListener('scroll', schedule, true);
+            window.removeEventListener('resize', schedule);
+        };
+    }, [isOpen]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

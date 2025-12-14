@@ -243,7 +243,6 @@ interface UserPreferences {
     lang: 'en' | 'ru';
     theme: 'light' | 'dark';
     hiddenApps: string[];
-    apiUsage?: Record<string, any>;
 }
 
 export interface BalanceEntry {
@@ -298,50 +297,30 @@ export const loadUserPreferences = async (): Promise<UserPreferences> => {
     return {
         lang: data.lang as 'en' | 'ru',
         theme: data.theme as 'light' | 'dark',
-        hiddenApps: data.hidden_apps || [],
-        apiUsage: data.api_usage || {}
+        hiddenApps: data.hidden_apps || []
     };
 };
 
-export const getApiUsage = async (service: string): Promise<number> => {
-    const prefs = await loadUserPreferences();
-    return prefs.apiUsage?.[service]?.count || 0;
-};
+// ============================================
+// Global API Usage (shared platform quota)
+// ============================================
 
-export const incrementApiUsage = async (service: string): Promise<number> => {
-    const userId = await getUserId();
-    const prefs = await loadUserPreferences();
-
-    const currentUsage = prefs.apiUsage?.[service] || { count: 0, month: new Date().toISOString().slice(0, 7) };
-
-    // Check if month changed, reset if needed (optional, but good practice)
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    if (currentUsage.month !== currentMonth) {
-        currentUsage.count = 0;
-        currentUsage.month = currentMonth;
-    }
-
-    currentUsage.count += 1;
-
-    const newApiUsage = {
-        ...(prefs.apiUsage || {}),
-        [service]: currentUsage
-    };
-
-    const { error } = await supabase
-        .from('user_preferences')
-        .update({
-            api_usage: newApiUsage,
-            updated_at: new Date().toISOString()
-        })
-        .eq('user_id', userId);
-
+export const getGlobalApiUsage = async (service: string): Promise<number> => {
+    const { data, error } = await supabase.rpc('get_global_api_usage', { service_name: service });
     if (error) {
-        console.error('Error incrementing API usage:', error);
+        console.warn('Error loading global API usage:', error);
+        return 0;
+    }
+    return typeof data === 'number' && Number.isFinite(data) ? Math.max(0, Math.trunc(data)) : 0;
+};
+
+export const incrementGlobalApiUsage = async (service: string): Promise<number> => {
+    const { data, error } = await supabase.rpc('increment_global_api_usage', { service_name: service });
+    if (error) {
+        console.error('Error incrementing global API usage:', error);
         throw error;
     }
-
-    return currentUsage.count;
+    return typeof data === 'number' && Number.isFinite(data) ? Math.max(0, Math.trunc(data)) : 0;
 };
 
 export const saveUserPreferences = async (prefs: UserPreferences): Promise<void> => {

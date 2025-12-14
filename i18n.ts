@@ -201,6 +201,10 @@ export const translations = {
         regenerate: 'Regenerate',
         clickToCopy: 'Click to copy',
         keywordSuggesterError: 'Failed to generate keywords. Please try again later.',
+        fetchTrafficConfirm: 'Fetch traffic data?',
+        requestsLeft: 'Requests left',
+        fetchTraffic: 'Fetch',
+        fetchTrafficFailed: 'Failed to fetch traffic data',
 
         // Top 20 Feature
         viewTop5: 'View Top 20',
@@ -411,6 +415,10 @@ export const translations = {
         regenerate: 'Пересоздать',
         clickToCopy: 'Нажмите для копирования',
         keywordSuggesterError: 'Не удалось сгенерировать ключи. Попробуйте позже.',
+        fetchTrafficConfirm: 'Загрузить данные по трафику?',
+        requestsLeft: 'Осталось запросов',
+        fetchTraffic: 'Загрузить',
+        fetchTrafficFailed: 'Не удалось получить данные по трафику',
 
         // Top 20 Feature
         viewTop5: 'Top 20',

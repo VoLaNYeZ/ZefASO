@@ -46,6 +46,7 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
     const [expanded, setExpanded] = useState(false);
     const [entries, setEntries] = useState<BalanceEntry[]>([]);
     const [loading, setLoading] = useState(false);
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<{ amount: string; note: string; date: string; mode: 'add' | 'spend' }>({
@@ -70,6 +71,7 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
     }, [entries, totalInstallCost]);
 
     const balanceRunout = useMemo(() => {
+        if (loading || !hasLoadedOnce) return null;
         const balance = Number.isFinite(totals.balance) ? totals.balance : 0;
         const today = formatLocalIsoDate(new Date());
         const start = addLocalDays(today, -6);
@@ -103,7 +105,7 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
         if (daysLeft === null || daysLeft > 5) return null;
 
         return { daysLeft };
-    }, [entries, recentInstallSpend7d, recentInstallSpendDates7d, totals.balance]);
+    }, [entries, recentInstallSpend7d, recentInstallSpendDates7d, totals.balance, loading, hasLoadedOnce]);
 
     const [showRunoutTip, setShowRunoutTip] = useState(false);
     const runoutTipRef = useRef<HTMLDivElement | null>(null);
@@ -118,17 +120,30 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
             setEntries([]);
             setExpanded(false);
             setShowRunoutTip(false);
+            setHasLoadedOnce(false);
             return;
         }
 
+        let cancelled = false;
         const load = async () => {
             setLoading(true);
-            const logs = await loadBalanceEntries();
-            setEntries(logs);
-            setLoading(false);
+            setHasLoadedOnce(false);
+            try {
+                const logs = await loadBalanceEntries();
+                if (cancelled) return;
+                setEntries(logs);
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                    setHasLoadedOnce(true);
+                }
+            }
         };
 
         load();
+        return () => {
+            cancelled = true;
+        };
     }, [session]);
 
     useEffect(() => {
@@ -258,14 +273,28 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
                 onClick={() => setExpanded(prev => !prev)}
                 className={`flex items-center gap-1.5 rounded-lg bg-slate-850 border border-slate-700 text-slate-100 px-2 py-1.5 shadow-md shadow-black/20 transition-all ${expanded ? 'ring-1 ring-indigo-500/60 bg-slate-800' : ''}`}
             >
-                <span
-                    className="font-semibold tabular-nums"
-                    style={{
-                        fontSize: formatCurrency(totals.balance).length >= 9 ? '0.8rem' : '0.9rem'
-                    }}
-                >
-                    {formatCurrency(totals.balance)}
-                </span>
+                {(() => {
+                    const formattedBalance = formatCurrency(totals.balance);
+                    const showInitialLoading = Boolean(session && !hasLoadedOnce);
+
+                    return (
+                        <span className="relative inline-flex items-center">
+                            <span
+                                className={`font-semibold tabular-nums ${showInitialLoading ? 'opacity-0' : ''}`}
+                                style={{
+                                    fontSize: formattedBalance.length >= 9 ? '0.8rem' : '0.9rem'
+                                }}
+                            >
+                                {formattedBalance}
+                            </span>
+                            {showInitialLoading && (
+                                <span className="absolute inset-0 inline-flex items-center justify-center text-slate-300">
+                                    <Loader2 size={16} className="animate-spin" />
+                                </span>
+                            )}
+                        </span>
+                    );
+                })()}
                 <span className="text-[10px] text-slate-500">{expanded ? '▴' : '▾'}</span>
             </button>
 
