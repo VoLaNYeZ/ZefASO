@@ -51,7 +51,7 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
     const [form, setForm] = useState<{ amount: string; note: string; date: string; mode: 'add' | 'spend' }>({
         amount: '',
         note: '',
-        date: new Date().toISOString().slice(0, 10),
+        date: formatLocalIsoDate(new Date()),
         mode: 'add'
     });
     const [showDatePicker, setShowDatePicker] = useState(false);
@@ -232,7 +232,7 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
         setError(null);
 
         const signedAmount = form.mode === 'add' ? parsedAmount : -parsedAmount;
-        const entryDate = form.date || new Date().toISOString().slice(0, 10);
+        const entryDate = form.date || formatLocalIsoDate(new Date());
 
         const saved = await addBalanceEntry({
             amount: signedAmount,

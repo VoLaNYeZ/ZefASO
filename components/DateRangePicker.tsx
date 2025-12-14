@@ -231,8 +231,9 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
     const todayStr = toStr(new Date());
     if (!startDate) return t.allTime;
 
-    const start = new Date(startDate);
-    const end = endDate ? new Date(endDate) : null;
+    // Use local date parsing for YYYY-MM-DD to avoid timezone shifts (Date("YYYY-MM-DD") is UTC)
+    const start = toDate(startDate);
+    const end = endDate ? toDate(endDate) : null;
     const hasEnd = !!endDate && !!end;
     const sameDay = hasEnd && endDate === startDate;
     const sameYear = hasEnd && !sameDay && start.getFullYear() === end!.getFullYear();

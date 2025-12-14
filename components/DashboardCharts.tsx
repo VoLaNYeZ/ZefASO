@@ -36,13 +36,22 @@ interface GroupedData {
   rankCount: number;
 }
 
+const toLocalIsoDate = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+const parseLocalIsoDate = (s: string) => new Date(`${s}T00:00:00`);
+
 // Helper to get the Monday of the week for a given date
 const getMonday = (d: Date) => {
   const date = new Date(d);
   const day = date.getDay();
   const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
   const monday = new Date(date.setDate(diff));
-  return monday.toISOString().split('T')[0];
+  return toLocalIsoDate(monday);
 };
 
 export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currencySymbol = '$', granularity, viewMode, theme, translations }) => {
@@ -61,7 +70,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, currency
       let key = curr.date;
       let displayDate = curr.date;
 
-      const dateObj = new Date(curr.date);
+      const dateObj = parseLocalIsoDate(curr.date);
 
       if (granularity === 'Weekly') {
         key = getMonday(dateObj);

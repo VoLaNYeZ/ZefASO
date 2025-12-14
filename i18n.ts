@@ -15,6 +15,7 @@ export const translations = {
         dashboard: 'Dashboard',
         store: 'Store',
         settings: 'Settings',
+        banBadgeTooltip: 'App Store page unavailable - app may be banned',
 
         // Time & Date
         daily: 'Daily View',
@@ -224,6 +225,7 @@ export const translations = {
         dashboard: 'Дашборд',
         store: 'В сторе',
         settings: 'Настройки',
+        banBadgeTooltip: 'Страница App Store недоступна - приложение может быть забанено',
 
         // Time & Date
         daily: 'По дням',

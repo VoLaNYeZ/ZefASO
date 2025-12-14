@@ -110,7 +110,7 @@ Current keyword set (already used): ${body.existingKeywords?.join(', ') || 'none
 
 Based on this:
 1. Infer what the app does, core use cases, and target audience.
-2. Propose 25–40 NEW keywords (not in the current set) that could bring traffic.
+2. Propose 25-40 NEW keywords (not in the current set) that could bring traffic.
    Mix:
    - Core/category terms
    - Feature / problem keywords

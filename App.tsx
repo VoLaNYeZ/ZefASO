@@ -74,6 +74,7 @@ import { computeWarnings } from './src/warnings/computeWarnings';
 import { addDays, formatDate } from './src/warnings/date';
 import { cloneDefaultWarningsRules } from './src/warnings/defaults';
 import type { WarningRuleId, WarningRuleSetting, WarningsSettings } from './src/warnings/types';
+import { extractNumericId, useAppStoreBanCheck } from './src/appstore/useAppStoreBanCheck';
 
 const VIEW_MODE_COOKIE = 'zeyf_view_mode';
 
@@ -187,6 +188,7 @@ const App = () => {
     // -- Auth State --
     const [session, setSession] = useState<Session | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
+    const sessionUserId = session?.user?.id ?? null;
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -573,6 +575,15 @@ const App = () => {
 
     const activeApps = useMemo(() => uniqueApps.filter(app => !hiddenApps.includes(app)), [uniqueApps, hiddenApps]);
     const archivedAppsList = useMemo(() => uniqueApps.filter(app => hiddenApps.includes(app)), [uniqueApps, hiddenApps]);
+
+    const { bannedAppIds } = useAppStoreBanCheck({
+        supabase,
+        sessionUserId,
+        dataLoading,
+        activeApps,
+        latestIdByGroup,
+        data
+    });
 
     useEffect(() => {
         const defaults = buildDefaultWarningsSettings(categories, uniqueApps, {
@@ -1741,6 +1752,8 @@ const App = () => {
                                         {apps.map(app => {
                                             const primaryAlias = appAliases[app]?.find(a => a.isPrimary && (a.prefix || a.number));
                                             const aliasLabel = formatAliasLabel(primaryAlias);
+                                            const numericId = extractNumericId(latestIdByGroup[app]);
+                                            const isBanned = !!(numericId && bannedAppIds[numericId]);
                                             return (
                                                 <div
                                                     key={app}
@@ -1758,6 +1771,14 @@ const App = () => {
                                                         <div className={`w-2 h-2 rounded-full shrink-0 ${filters.appName === app && currentPage === 'dashboard' ? 'bg-indigo-500' : 'bg-slate-600'}`} />
                                                     )}
                                                     <div className="flex items-center gap-1 min-w-0">
+                                                        {isBanned && (
+                                                            <span
+                                                                className="shrink-0 text-[10px] font-bold text-rose-200 bg-rose-500/20 border border-rose-500/30 rounded-md px-1 py-[2px] leading-none"
+                                                                title={t.banBadgeTooltip}
+                                                            >
+                                                                BAN
+                                                            </span>
+                                                        )}
                                                         {aliasLabel && (
                                                             <span className="shrink-0 text-[10px] font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 rounded-md px-1 py-[2px] leading-none">
                                                                 [{aliasLabel}]
@@ -1840,6 +1861,8 @@ const App = () => {
                                     (() => {
                                         const primaryAlias = appAliases[app]?.find(a => a.isPrimary && (a.prefix || a.number));
                                         const aliasLabel = formatAliasLabel(primaryAlias);
+                                        const numericId = extractNumericId(latestIdByGroup[app]);
+                                        const isBanned = !!(numericId && bannedAppIds[numericId]);
                                         return (
                                     <div
                                         key={app}
@@ -1856,6 +1879,14 @@ const App = () => {
                                                 <div className={`w-2 h-2 rounded-full shrink-0 ${filters.appName === app && currentPage === 'dashboard' ? 'bg-indigo-500' : 'bg-slate-600'}`} />
                                             )}
                                             <div className="flex items-center gap-1 min-w-0">
+                                                {isBanned && (
+                                                    <span
+                                                        className="shrink-0 text-[10px] font-bold text-rose-200 bg-rose-500/20 border border-rose-500/30 rounded-md px-1 py-[2px] leading-none"
+                                                        title={t.banBadgeTooltip}
+                                                    >
+                                                        BAN
+                                                    </span>
+                                                )}
                                                 {aliasLabel && (
                                                     <span className="shrink-0 text-[10px] font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 rounded-md px-1 py-[2px] leading-none">
                                                         [{aliasLabel}]

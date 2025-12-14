@@ -156,21 +156,21 @@ export const processSheetData = (rows: any[][], tabName: string): AsoEntry[] => 
 
         // If no rows pass validation, throw descriptive error
         if (validRows === 0 && VALIDATION_SAMPLE_SIZE > 0) {
-            let errorMsg = `❌ Data format validation failed for tab "${tabName}".\n\n`;
+            let errorMsg = `Data format validation failed for tab "${tabName}".\n\n`;
             errorMsg += `Expected format: Date | App Name | GEO | ID | Keyword | Last Plan | Ranking | Installs | [CPI]\n\n`;
 
             if (hasInvalidId && hasInvalidKeyword) {
                 errorMsg += `Problem: Both ID and Keyword columns appear incorrect.\n`;
-                errorMsg += `• Column 4 (ID) should contain only numbers\n`;
-                errorMsg += `• Column 5 (Keyword) should contain text (not "no data")\n\n`;
-                errorMsg += `💡 Tip: Check if your columns are aligned correctly in the Google Sheet.`;
+                errorMsg += `- Column 4 (ID) should contain only numbers\n`;
+                errorMsg += `- Column 5 (Keyword) should contain text (not "no data")\n\n`;
+                errorMsg += `Tip: Check if your columns are aligned correctly in the Google Sheet.`;
             } else if (hasInvalidId) {
                 errorMsg += `Problem: Column 4 (ID) should contain only numbers.\n`;
                 errorMsg += `Found: Non-numeric values instead.\n\n`;
-                errorMsg += `💡 Tip: Make sure the App ID column is in the correct position.`;
+                errorMsg += `Tip: Make sure the App ID column is in the correct position.`;
             } else if (hasInvalidKeyword) {
                 errorMsg += `Problem: Column 5 (Keyword) appears empty or contains "no data".\n\n`;
-                errorMsg += `💡 Tip: Verify that keyword data is in the correct column.`;
+                errorMsg += `Tip: Verify that keyword data is in the correct column.`;
             }
 
             throw new Error(errorMsg);

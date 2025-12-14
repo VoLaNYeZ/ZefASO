@@ -4,11 +4,13 @@ import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
 
-console.log('Starting app initialization...');
-console.log('Environment variables:', {
-  supabaseUrl: import.meta.env.VITE_SUPABASE_URL ? 'Set' : 'Missing',
-  supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Missing'
-});
+if (import.meta.env.DEV) {
+  console.log('Starting app initialization...');
+  console.log('Environment variables:', {
+    supabaseUrl: import.meta.env.VITE_SUPABASE_URL ? 'Set' : 'Missing',
+    supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Missing'
+  });
+}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -16,7 +18,7 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-console.log('Root element found, creating React root...');
+if (import.meta.env.DEV) console.log('Root element found, creating React root...');
 
 // Global error handler for unhandled promise rejections
 window.addEventListener('unhandledrejection', (event) => {
@@ -32,4 +34,4 @@ root.render(
     </ErrorBoundary>
   </React.StrictMode>
 );
-console.log('App rendered successfully!');
+if (import.meta.env.DEV) console.log('App rendered successfully!');
