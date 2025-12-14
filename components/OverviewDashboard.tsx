@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
     DollarSign,
     Smartphone,
@@ -9,6 +9,7 @@ import {
     Download,
     AlertTriangle,
     Sparkles,
+    ArrowLeft,
     Globe,
     Type,
     LayoutTemplate,
@@ -116,6 +117,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         const saved = localStorage.getItem('zeyfaso_overview_mode');
         return (saved === 'keyword' || saved === 'geo') ? saved : 'keyword';
     });
+    const [isTotalSpendFlipped, setIsTotalSpendFlipped] = useState(false);
+    const spendTouchStartRef = useRef<{ x: number; y: number } | null>(null);
 
     // Persist desktop overview filters for same-day revisits
     useEffect(() => {
@@ -179,6 +182,63 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     const isYesterday = startDate === yesterdayStr && endDate === yesterdayStr;
     const isThisMonth = startDate === thisMonthStart && endDate === thisMonthEnd;
     const isLastMonth = startDate === lastMonthStart && endDate === lastMonthEnd;
+
+    const isIsoDate = (s: string | null | undefined) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+    const addDaysStr = (dateStr: string, deltaDays: number) => {
+        const d = new Date(`${dateStr}T00:00:00`);
+        if (Number.isNaN(d.getTime())) return dateStr;
+        d.setDate(d.getDate() + deltaDays);
+        return toLocalStr(d);
+    };
+
+    const endFor7d = isIsoDate(endDate) ? (endDate as string) : todayStr;
+    const startFor7d = addDaysStr(endFor7d, -6);
+
+    const formatSpendCompact = (value: number) => {
+        const v = Number(value);
+        if (!Number.isFinite(v)) return '';
+        if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1).replace(/\\.0$/, '')}m`;
+        if (v >= 1_000) return `${(v / 1_000).toFixed(1).replace(/\\.0$/, '')}k`;
+        return `${Math.round(v)}`;
+    };
+
+    const spend7dSeries = useMemo(() => {
+        const dates: string[] = [];
+        for (let i = 6; i >= 0; i--) dates.push(addDaysStr(endFor7d, -i));
+
+        const spendByDate = new Map<string, number>();
+        dates.forEach(d => spendByDate.set(d, 0));
+
+        data.forEach(d => {
+            const group = d.appGroup || d.appName;
+            if (d.date < startFor7d || d.date > endFor7d) return;
+            if (selectedCategory !== 'All') {
+                const appCat = appCategoryMap[group] || 'Uncategorized';
+                if (appCat !== selectedCategory) return;
+            }
+            if (selectedApp !== 'All' && group !== selectedApp) return;
+
+            const installs = Number(d.installs);
+            const cpi = Number(d.cpi);
+            if (!Number.isFinite(installs) || !Number.isFinite(cpi)) return;
+            spendByDate.set(d.date, (spendByDate.get(d.date) || 0) + installs * cpi);
+        });
+
+        const points = dates.map(date => ({ date, spend: spendByDate.get(date) || 0 }));
+        const candles = points.map((p, idx) => {
+            const open = idx === 0 ? p.spend : points[idx - 1].spend;
+            const close = p.spend;
+            const high = Math.max(open, close);
+            const low = Math.min(open, close);
+            return { ...p, open, close, high, low };
+        });
+
+        const maxHigh = Math.max(1, ...candles.map(c => c.high));
+        const maxSpend = Math.max(1, ...points.map(p => p.spend));
+        const total = points.reduce((acc, p) => acc + p.spend, 0);
+
+        return { points, candles, maxHigh, maxSpend, total };
+    }, [data, selectedCategory, selectedApp, appCategoryMap, startFor7d, endFor7d]);
 
     // -- Aggregation Logic --
     const aggregatedData: ProcessedApp[] = useMemo(() => {
@@ -362,26 +422,25 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     const availableApps = useMemo(() => Array.from(new Set(data.map(d => d.appGroup || d.appName))).sort(), [data]);
 
     return (
-        <div className="p-6 pb-20 pt-16 md:pt-6 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
+            <div className="p-6 pb-20 pt-16 md:pt-6 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
 
-            {/* Header & Controls */}
-            <div className="sticky top-4 z-30 bg-slate-50/70 dark:bg-slate-900/70 backdrop-blur-md rounded-xl p-4 flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-end shadow-sm">
-                <div className="hidden md:block">
-                    <div className="flex items-center gap-3 mb-1">
-                        <div className="p-2 bg-gradient-to-br from-fuchsia-500 to-pink-500 rounded-lg">
-                            <LayoutGrid size={24} className="text-white" />
-                        </div>
-                        <h2
+                {/* Header & Controls */}
+                <div className="sticky top-4 z-30 bg-slate-50/70 dark:bg-slate-900/70 backdrop-blur-md rounded-xl px-4 py-3 flex flex-col xl:flex-row gap-3 justify-between items-start xl:items-center shadow-sm">
+                    <div className="hidden md:block min-w-0 xl:max-w-[360px] min-[1668px]:max-w-[420px] min-[1900px]:max-w-[560px] xl:self-center">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-gradient-to-br from-fuchsia-500 to-pink-500 rounded-lg">
+                                <LayoutGrid size={24} className="text-white" />
+                            </div>
+                            <h2
                             title={t.overviewDescription}
-                            className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight"
+                            className="text-2xl 2xl:text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight"
                         >
                             {t.overview}
                         </h2>
+                        </div>
                     </div>
-                    <p className="overview-desc text-slate-500 dark:text-slate-400 font-medium">{t.overviewDescription}</p>
-                </div>
 
-                <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm w-full xl:w-auto">
+                <div className="bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm w-full xl:w-auto">
                     {/* Mobile compact layout */}
                     <div className="flex md:hidden flex-col gap-2">
                         <div className="grid grid-cols-2 gap-2">
@@ -547,21 +606,127 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
             {/* Hero Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="relative overflow-hidden rounded-3xl p-8 bg-gradient-to-br from-indigo-600 via-purple-600 to-fuchsia-600 text-white shadow-2xl shadow-indigo-500/20 group hover:scale-[1.01] transition-transform duration-300">
+                <div
+                    className="relative overflow-hidden rounded-3xl p-8 bg-gradient-to-br from-indigo-600 via-purple-600 to-fuchsia-600 text-white shadow-2xl shadow-indigo-500/20 group hover:scale-[1.01] transition-transform duration-300 flex flex-col"
+                    onTouchStart={(e) => {
+                        const t = e.touches[0];
+                        if (!t) return;
+                        spendTouchStartRef.current = { x: t.clientX, y: t.clientY };
+                    }}
+                    onTouchEnd={(e) => {
+                        const start = spendTouchStartRef.current;
+                        spendTouchStartRef.current = null;
+                        if (!start) return;
+                        const t = e.changedTouches[0];
+                        if (!t) return;
+                        const dx = t.clientX - start.x;
+                        const dy = t.clientY - start.y;
+                        if (Math.abs(dx) < 60) return;
+                        if (Math.abs(dx) < Math.abs(dy) + 20) return;
+                        setIsTotalSpendFlipped(v => !v);
+                    }}
+                >
                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
                         <DollarSign size={180} strokeWidth={1} />
                     </div>
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2 mb-2 text-indigo-100 font-bold uppercase tracking-wider text-sm">
-                            <DollarSign size={16} /> {t.totalSpend}
+
+                    <div className="absolute inset-0 z-10 [perspective:1200px]">
+                        <div
+                            className={`relative h-full w-full transition-transform duration-500 [transform-style:preserve-3d] [will-change:transform] ${isTotalSpendFlipped ? '[transform:rotateY(180deg)]' : ''}`}
+                        >
+                            <div
+                                className={`absolute inset-0 [backface-visibility:hidden] ${isTotalSpendFlipped ? 'pointer-events-none' : 'pointer-events-auto'}`}
+                            >
+                                <div className="flex items-center gap-2 mb-2 text-indigo-100 font-bold uppercase tracking-wider text-sm">
+                                    <DollarSign size={16} /> {t.totalSpend}
+                                </div>
+                                <div className="text-6xl sm:text-7xl font-black tracking-tighter tabular-nums">
+                                    {currencySymbol}{grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </div>
+                                <p className="mt-4 text-indigo-100 font-medium opacity-90">
+                                    {t.investedAcross} {activeAppsCount} {t.appsInPeriod}
+                                </p>
+                            </div>
+
+                            <div
+                                className={`absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] ${isTotalSpendFlipped ? 'pointer-events-auto' : 'pointer-events-none'}`}
+                            >
+                                <div className="absolute left-8 right-8 top-8 bottom-[30px] min-h-0 grid grid-rows-[auto_auto_1fr] gap-3">
+                                    <div className="flex items-center justify-between gap-3 min-w-0">
+                                        <div className="flex items-center gap-2 min-w-0 text-indigo-100 font-bold uppercase tracking-wider text-sm">
+                                            <DollarSign size={16} />
+                                            <span className="truncate">{t.spentIn7d || 'Spent in 7d'}</span>
+                                        </div>
+                                        <div className="text-[11px] font-bold text-indigo-100/90 tabular-nums whitespace-nowrap">
+                                            ({currencySymbol}{grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
+                                        </div>
+                                    </div>
+
+                                    <div className="text-xl sm:text-2xl font-black tracking-tighter tabular-nums">
+                                        {currencySymbol}{spend7dSeries.total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                    </div>
+
+                                    <div className="h-full min-h-0 rounded-2xl bg-white/10 border border-white/15 px-2 pb-2 pt-4 overflow-hidden">
+                                        <div className="h-full flex items-end gap-1.5">
+                                            {spend7dSeries.points.map((p, idx) => {
+                                                const prev = idx === 0 ? p.spend : spend7dSeries.points[idx - 1].spend;
+                                                const barPctRaw = (Math.max(0, p.spend) / spend7dSeries.maxSpend) * 100;
+                                                const barPct = Number.isFinite(barPctRaw) ? Math.min(100, Math.max(0, barPctRaw)) : 0;
+                                                const isUp = p.spend >= prev;
+                                                const color = isUp ? 'bg-rose-200/90' : 'bg-emerald-200/90';
+                                                const valueLabelRaw = formatSpendCompact(p.spend);
+                                                const valueLabel = valueLabelRaw ? `${currencySymbol}${valueLabelRaw}` : '';
+
+                                                return (
+                                                    <div key={p.date} className="flex-1 min-w-0 h-full flex flex-col items-center gap-1">
+                                                        <div className="relative w-full flex-1 min-h-0 flex items-end justify-center px-0.5">
+                                                            <div
+                                                                className={`w-[10px] ${color} rounded-sm relative min-h-[2px]`}
+                                                                style={{ height: `${barPct}%` }}
+                                                            >
+                                                                {valueLabel ? (
+                                                                    <div className="absolute left-1/2 -translate-x-1/2 -top-4 text-[8px] font-black leading-[10px] text-white/90 tabular-nums drop-shadow whitespace-nowrap text-center">
+                                                                        {valueLabel}
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-[10px] font-bold text-indigo-50/80 tabular-nums">
+                                                            {p.date.slice(8)}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="text-6xl sm:text-7xl font-black tracking-tighter">
-                            {currencySymbol}{grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                        </div>
-                        <p className="mt-4 text-indigo-100 font-medium opacity-90">
-                            {t.investedAcross} {activeAppsCount} {t.appsInPeriod}
-                        </p>
                     </div>
+
+                    {isTotalSpendFlipped ? (
+                        <div className="absolute left-8 right-8 bottom-[30px] h-px bg-white/18 z-10" />
+                    ) : null}
+
+                    {!isTotalSpendFlipped ? (
+                        <button
+                            type="button"
+                            onClick={() => setIsTotalSpendFlipped(true)}
+                            className="absolute bottom-0 left-1/2 -translate-x-1/2 inline-flex items-center justify-center h-7 gap-2 px-3 rounded-t-xl rounded-b-none bg-white/12 hover:bg-white/18 border border-white/25 border-b-0 text-white/95 text-xs font-black transition-colors backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.10)] z-20"
+                        >
+                            {t.last7DaysPill || 'Last 7d'}
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setIsTotalSpendFlipped(false)}
+                            aria-label={t.back}
+                            title={t.back}
+                            className="absolute bottom-0 left-1/2 -translate-x-1/2 inline-flex items-center justify-center h-7 px-3 rounded-t-xl rounded-b-none bg-white/12 hover:bg-white/18 border border-white/25 border-b-0 text-white/95 text-xs font-black transition-colors backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.10)] z-20"
+                        >
+                            <ArrowLeft size={14} />
+                        </button>
+                    )}
                 </div>
 
                 <div className="relative overflow-hidden rounded-3xl p-8 bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-xl shadow-slate-500/20 group hover:scale-[1.01] transition-transform duration-300">
