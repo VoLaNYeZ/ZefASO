@@ -49,7 +49,8 @@ import {
     Moon,
     Languages,
     LogOut,
-    Bell
+    Bell,
+    Loader2
 } from 'lucide-react';
 import { INITIAL_DATA } from './constants';
 import { AsoEntry, AppAlias, FilterState, Granularity } from './types';
@@ -464,6 +465,13 @@ const App = () => {
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+    const [aiAnalysisMeta, setAiAnalysisMeta] = useState<{ start: string; end: string; rows: number; days: number } | null>(null);
+    const aiAnalysisRef = useRef<HTMLDivElement | null>(null);
+    const aiAnalysisScrollKeyRef = useRef<string>('');
+    const aiAnalysisCacheRef = useRef<Record<string, { analysis: string; meta: { start: string; end: string; rows: number; days: number } | null; updatedAt: number }>>({});
+    const aiAnalysisCacheKeyRef = useRef<string>('');
+    const aiAnalysisReqIdRef = useRef(0);
+    const aiAnalysisShouldScrollRef = useRef(false);
     const [isHiddenSectionOpen, setIsHiddenSectionOpen] = useState(false);
     const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
     const [deleteAllConfirmation, setDeleteAllConfirmation] = useState(false);
@@ -709,9 +717,37 @@ const App = () => {
 
 
     // Reset AI Analysis when filters change to avoid showing stale data
+    const aiAnalysisCacheKey = useMemo(() => {
+        const appName = filters.appName || '';
+        const appId = filters.appId || '';
+        const geo = filters.geo || '';
+        const keyword = filters.keyword || '';
+        const startDate = filters.startDate || '';
+        const endDate = filters.endDate || '';
+        const g = granularity || '';
+        return [lang, appName, appId, geo, keyword, startDate, endDate, g].join('|');
+    }, [filters.appName, filters.appId, filters.geo, filters.keyword, filters.startDate, filters.endDate, granularity, lang]);
+
     useEffect(() => {
-        setAiAnalysis(null);
-    }, [filters.appName, filters.appId, filters.geo, filters.keyword, filters.startDate, filters.endDate, granularity]);
+        aiAnalysisCacheKeyRef.current = aiAnalysisCacheKey;
+        const cached = aiAnalysisCacheRef.current[aiAnalysisCacheKey];
+        setAiAnalysis(cached?.analysis || null);
+        setAiAnalysisMeta(cached?.meta || null);
+        setIsAnalyzing(false);
+    }, [aiAnalysisCacheKey]);
+
+    useEffect(() => {
+        if (!aiAnalysisShouldScrollRef.current) return;
+        if (!isAnalyzing && !aiAnalysis) return;
+
+        const scrollKey = `${isAnalyzing ? '1' : '0'}|${aiAnalysis ? aiAnalysis.length : 0}`;
+        if (aiAnalysisScrollKeyRef.current === scrollKey) return;
+        aiAnalysisScrollKeyRef.current = scrollKey;
+
+        requestAnimationFrame(() => {
+            aiAnalysisRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+    }, [isAnalyzing, aiAnalysis]);
 
     // Secondary Filters Options
     const availableAppIds = useMemo(() => {
@@ -1400,13 +1436,20 @@ const App = () => {
     };
 
     const runAnalysis = async () => {
+        const reqId = aiAnalysisReqIdRef.current + 1;
+        aiAnalysisReqIdRef.current = reqId;
+        aiAnalysisShouldScrollRef.current = true;
+        const keyAtStart = aiAnalysisCacheKeyRef.current;
+
         setIsAnalyzing(true);
         setAiAnalysis(null);
-
-        // Scroll to bottom immediately to show we are working
-        setTimeout(() => {
-            mainContentRef.current?.scrollTo({ top: mainContentRef.current.scrollHeight, behavior: 'smooth' });
-        }, 100);
+        setAiAnalysisMeta(() => {
+            const dates = filteredData.map(d => d.date).filter(Boolean).sort();
+            const start = dates[0] || '';
+            const end = dates.length > 0 ? dates[dates.length - 1] : '';
+            const days = new Set(dates).size;
+            return { start, end, rows: filteredData.length, days };
+        });
 
         const result = await analyzeASOTrends(
             filteredData,
@@ -1415,13 +1458,22 @@ const App = () => {
             filters.keyword,
             lang
         );
+        if (aiAnalysisReqIdRef.current !== reqId) return;
+        if (aiAnalysisCacheKeyRef.current !== keyAtStart) return;
+
         setAiAnalysis(result);
         setIsAnalyzing(false);
-
-        // Scroll again to show result
-        setTimeout(() => {
-            mainContentRef.current?.scrollTo({ top: mainContentRef.current.scrollHeight, behavior: 'smooth' });
-        }, 100);
+        aiAnalysisCacheRef.current[keyAtStart] = {
+            analysis: result,
+            meta: (() => {
+                const dates = filteredData.map(d => d.date).filter(Boolean).sort();
+                const start = dates[0] || '';
+                const end = dates.length > 0 ? dates[dates.length - 1] : '';
+                const days = new Set(dates).size;
+                return { start, end, rows: filteredData.length, days };
+            })(),
+            updatedAt: Date.now()
+        };
     };
 
     // -- Category Management Handlers (Using Modal) --
@@ -2489,14 +2541,35 @@ const App = () => {
                             })()}
 
                             {/* AI Analysis Section */}
-                            {aiAnalysis && (
-                                <div className="mt-8 bg-white dark:bg-slate-900 rounded-2xl border border-indigo-100 dark:border-indigo-900 shadow-lg overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            {(aiAnalysis || isAnalyzing) && (
+                                <div
+                                    ref={aiAnalysisRef}
+                                    className="mt-8 bg-white dark:bg-slate-900 rounded-2xl border border-indigo-100 dark:border-indigo-900 shadow-lg overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500"
+                                >
                                     <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex items-center gap-3">
                                         <BrainCircuit className="text-white animate-pulse" size={24} />
-                                        <h3 className="text-lg font-bold text-white">{t.aiAnalysis}</h3>
+                                        <div className="min-w-0">
+                                            <h3 className="text-lg font-bold text-white">{t.aiAnalysis}</h3>
+                                            {aiAnalysisMeta?.start && aiAnalysisMeta?.end && (
+                                                <div className="text-[11px] text-white/75 font-medium">
+                                                    {aiAnalysisMeta.start} - {aiAnalysisMeta.end} - {aiAnalysisMeta.rows} {lang === 'ru' ? 'строк' : 'rows'}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {isAnalyzing && (
+                                            <div className="ml-auto flex items-center gap-2 text-white/80 text-xs font-semibold">
+                                                <Loader2 size={14} className="animate-spin" />
+                                                <span>{t.analyzing}</span>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="p-6">
-                                        {aiAnalysis.startsWith('Failed') || aiAnalysis.startsWith('API Key is missing') ? (
+                                        {isAnalyzing && !aiAnalysis ? (
+                                            <div className="flex flex-col items-center justify-center py-8 text-slate-400 animate-in fade-in zoom-in duration-300">
+                                                <Loader2 size={24} className="animate-spin mb-2 text-purple-500" />
+                                                <p className="text-sm font-medium">{t.analyzing}</p>
+                                            </div>
+                                        ) : aiAnalysis && (aiAnalysis.startsWith('Failed') || aiAnalysis.startsWith('API Key is missing')) ? (
                                             <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg">
                                                 <p className="text-sm text-red-600 dark:text-red-400 text-center">{t.aiAnalysisError}</p>
                                             </div>
@@ -2505,6 +2578,10 @@ const App = () => {
                                                 <div dangerouslySetInnerHTML={{
                                                     __html: DOMPurify.sanitize(
                                                         aiAnalysis
+                                                            .replace(/\r\n/g, '\n')
+                                                            .replace(/\n{2,}/g, '\n')
+                                                            .replace(/^####\s+(.*)$/gm, '<div class="mt-2 mb-1 text-[13px] font-bold text-slate-800 dark:text-slate-200">$1</div>')
+                                                            .replace(/^###\s+(.*)$/gm, '<div class="mt-3 mb-1 text-[15px] font-extrabold text-slate-900 dark:text-white">$1</div>')
                                                             .replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-800 dark:text-slate-200 font-bold">$1</strong>')
                                                             .replace(/\* (.*?)\n/g, '<li class="ml-4 list-disc text-slate-700 dark:text-slate-300">$1</li>')
                                                             .replace(/\n/g, '<br />'),

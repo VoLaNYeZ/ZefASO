@@ -47,8 +47,8 @@ serve(async (req) => {
         const body: OpenAIRequest = await req.json();
 
         let messages: { role: string; content: string }[] = [];
-        let model = 'gpt-4o-mini';
-        let maxTokens = 2000;
+        let model = 'gpt-5-nano-2025-08-07';
+        let maxTokens = 900;
         let responseFormat: { type: string } | undefined;
 
         if (body.type === 'analysis') {
@@ -59,26 +59,41 @@ serve(async (req) => {
             messages = [
                 {
                     role: 'system',
-                    content: 'You are an expert ASO (App Store Optimization) Manager providing professional analysis and recommendations.'
+                    content: 'You are an expert ASO (App Store Optimization) Manager. Be concise, practical, and avoid incorrect causal claims.'
                 },
                 {
                     role: 'user',
                     content: `
-You are an expert ASO (App Store Optimization) Manager.
+You are an ASO operator optimizing Rank via controlled Installs (phone farm). Your goal is Rank efficiency.
 Analyze the following performance data for App: "${body.appName}", GEO: "${body.geo}", Keyword: "${body.keyword}".
 
 Data:
 ${body.dataSummary}
 
-Please provide a concise analysis covering:
-1. The correlation between Ranking and Installs.
-2. Cost efficiency trends.
-3. Actionable recommendations to improve ROI and Ranking (e.g., increase bid, change keyword).
+Important assumptions:
+- Never say that improving Rank causes more Installs. Treat Installs as the main input signal that can influence Rank.
+- Rank = 0 means no ranking data for that day or no ranking data at all.
+- CPI is an internal value we set. Do not analyze CPI trends as a market signal. Use it only to estimate spend and efficiency.
+- If you mention relationships, phrase them as "Installs and Rank moved together" or "Installs changes preceded Rank changes".
 
-Keep the tone professional and executive-summary style.
-${languageInstruction}
-                    `.trim()
-                }
+Output requirements:
+- Keep it short - no long paragraphs.
+- Use exactly 3 sections with headings (use ###):
+  ### Insights
+  ### Efficiency
+  ### Next actions
+- Each section: 2-4 bullets max, use "-" bullets only.
+
+ Please provide a concise analysis covering:
+  1. How Rank responds to Installs over time (look for lag, speed and amount of installs needed to improve Rank, diminishing returns, and days where spend did not improve Rank).
+  2. Efficiency of spend: highlight where Installs and estimated spend likely produced Rank improvement vs wasted spend.
+  3. Actionable recommendations to improve Rank efficiency (e.g., change install volume, pause or reduce spend on stuck keywords, test alternatives).
+  4. Use the full period shown in the header. Mention period start and end. If the period is short, state it.
+ 
+ Keep the tone professional and executive-summary style.
+ ${languageInstruction}
+                     `.trim()
+                 }
             ];
         } else if (body.type === 'keywords') {
             model = 'gpt-4o-mini';

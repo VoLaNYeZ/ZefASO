@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { RefreshCw, Clock, AlertCircle, CheckCircle2, Trophy, Eye, Activity } from 'lucide-react';
 import { fetchAppRank, fetchTop5Apps, Top5App } from '../lib/itunesService';
 import { loadRealtimeRankings, saveRealtimeRanking, RealtimeRanking, getGlobalApiUsage, incrementGlobalApiUsage, fetchCountryRankings, CountryRanking } from '../lib/supabaseService';
@@ -37,6 +37,8 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
     const [apiUsageCount, setApiUsageCount] = useState<number>(0);
     const [countryRankings, setCountryRankings] = useState<Record<string, CountryRanking>>({});
     const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
+    const rankReqIdRef = useRef<Record<string, number>>({});
+    const trafficReqIdRef = useRef<Record<string, number>>({});
 
     // Popover State
     const [popoverState, setPopoverState] = useState<{
@@ -99,29 +101,41 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
 
     const handleRefresh = async (keyword: string, geo: string) => {
         const key = getKey(keyword, geo);
+        const reqId = (rankReqIdRef.current[key] || 0) + 1;
+        rankReqIdRef.current[key] = reqId;
         setLoadingState(prev => ({ ...prev, [key]: true }));
 
         try {
             // Fetch from iTunes
             const rank = await fetchAppRank(keyword, geo, appId);
 
-            const currentRanking = rankings[key];
-            const newRanking: RealtimeRanking = {
-                ...(currentRanking || {
+            if (rankReqIdRef.current[key] !== reqId) return;
+
+            const nowIso = new Date().toISOString();
+
+            // Optimistic update - merge into latest state to avoid wiping traffic fields
+            setRankings(prev => {
+                const base: RealtimeRanking = prev[key] || {
                     appId,
                     keyword,
                     geo,
                     rank: null,
-                    lastUpdated: new Date().toISOString()
-                }),
-                rank,
-                lastUpdated: new Date().toISOString()
-            };
+                    lastUpdated: nowIso
+                };
 
-            // Optimistic update - do not block UI on Supabase write
-            setRankings(prev => ({ ...prev, [key]: newRanking }));
-            saveRealtimeRanking(newRanking).catch((err) => {
-                console.warn('Failed to save realtime ranking update:', err);
+                const merged: RealtimeRanking = {
+                    ...base,
+                    rank,
+                    lastUpdated: nowIso
+                };
+
+                queueMicrotask(() => {
+                    saveRealtimeRanking(merged).catch((err) => {
+                        console.warn('Failed to save realtime ranking update:', err);
+                    });
+                });
+
+                return { ...prev, [key]: merged };
             });
         } catch (error) {
             console.error(`Failed to refresh ${keyword} in ${geo}`, error);
@@ -135,33 +149,45 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
         if (!keyword || !geo) return;
 
         const key = getKey(keyword, geo);
+        const reqId = (trafficReqIdRef.current[key] || 0) + 1;
+        trafficReqIdRef.current[key] = reqId;
         setTrafficLoadingState(prev => ({ ...prev, [key]: true }));
 
         try {
             const trafficData = await fetchTrafficData(keyword, geo);
 
+            if (trafficReqIdRef.current[key] !== reqId) return;
+
             // Increment usage
             const newCount = await incrementGlobalApiUsage('aso_mobile');
             setApiUsageCount(newCount);
 
-            const currentRanking = rankings[key];
-            const updatedRanking: RealtimeRanking = {
-                ...(currentRanking || {
+            const nowIso = new Date().toISOString();
+
+            // Optimistic update - merge into latest state to avoid wiping rank fields
+            setRankings(prev => {
+                const base: RealtimeRanking = prev[key] || {
                     appId,
                     keyword,
                     geo,
                     rank: null,
-                    lastUpdated: new Date().toISOString()
-                }),
-                traffic: trafficData.traffic?.value,
-                trafficData: trafficData,
-                lastUpdated: new Date().toISOString()
-            };
+                    lastUpdated: nowIso
+                };
 
-            // Optimistic update - do not block UI on Supabase write
-            setRankings(prev => ({ ...prev, [key]: updatedRanking }));
-            saveRealtimeRanking(updatedRanking).catch((err) => {
-                console.warn('Failed to save realtime ranking traffic update:', err);
+                const merged: RealtimeRanking = {
+                    ...base,
+                    traffic: trafficData.traffic?.value,
+                    trafficData: trafficData,
+                    lastUpdated: nowIso
+                };
+
+                queueMicrotask(() => {
+                    saveRealtimeRanking(merged).catch((err) => {
+                        console.warn('Failed to save realtime ranking traffic update:', err);
+                    });
+                });
+
+                return { ...prev, [key]: merged };
             });
         } catch (error: any) {
             console.error(`Failed to fetch traffic for ${keyword} in ${geo}`, error);

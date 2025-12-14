@@ -9,10 +9,71 @@ export const analyzeASOTrends = async (
     keyword: string,
     language: 'en' | 'ru' = 'en'
 ): Promise<string> => {
-    // Summarize data to reduce token count
-    const dataSummary = entries.map(e =>
-        `Date: ${e.date}, Rank: ${e.ranking}, Installs: ${e.installs}, CPI: $${e.cpi}`
-    ).join('\n');
+    const safeEntries = Array.isArray(entries) ? [...entries] : [];
+    safeEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const dates = safeEntries.map(e => e.date).filter(Boolean);
+    const periodStart = dates[0] || 'Unknown';
+    const periodEnd = dates.length > 0 ? dates[dates.length - 1] : 'Unknown';
+    const uniqueDays = new Set(dates).size;
+
+    const installsTotal = safeEntries.reduce((sum, e) => sum + (Number.isFinite(e.installs) ? e.installs : 0), 0);
+    const spendTotal = safeEntries.reduce((sum, e) => {
+        const installs = Number.isFinite(e.installs) ? e.installs : 0;
+        const cpi = Number.isFinite(e.cpi) ? e.cpi : 0;
+        return sum + installs * cpi;
+    }, 0);
+
+    const validRanks = safeEntries.map(e => e.ranking).filter(r => Number.isFinite(r) && r > 0) as number[];
+    const bestRank = validRanks.length > 0 ? Math.min(...validRanks) : null;
+    const worstRank = validRanks.length > 0 ? Math.max(...validRanks) : null;
+
+    const startValid = safeEntries.find(e => Number.isFinite(e.ranking) && e.ranking > 0) || null;
+    const endValid = [...safeEntries].reverse().find(e => Number.isFinite(e.ranking) && e.ranking > 0) || null;
+
+    const header =
+        language === 'ru'
+            ? [
+                `Период: ${periodStart} - ${periodEnd}`,
+                `Строк: ${safeEntries.length}, дней: ${uniqueDays}`,
+                `Инсталлы: ${installsTotal}, траты (оценка): $${spendTotal.toFixed(2)}`,
+                `Ранг (валидный): ${bestRank !== null ? `лучший ${bestRank}` : 'нет данных'}${worstRank !== null ? `, худший ${worstRank}` : ''}`,
+                `${startValid ? `Старт: ${startValid.date} rank ${startValid.ranking}` : 'Старт: нет валидного ранга'}`,
+                `${endValid ? `Финиш: ${endValid.date} rank ${endValid.ranking}` : 'Финиш: нет валидного ранга'}`
+            ].join('\n')
+            : [
+                `Period: ${periodStart} - ${periodEnd}`,
+                `Rows: ${safeEntries.length}, days: ${uniqueDays}`,
+                `Installs: ${installsTotal}, est spend: $${spendTotal.toFixed(2)}`,
+                `Rank (valid): ${bestRank !== null ? `best ${bestRank}` : 'no data'}${worstRank !== null ? `, worst ${worstRank}` : ''}`,
+                `${startValid ? `Start: ${startValid.date} rank ${startValid.ranking}` : 'Start: no valid rank'}`,
+                `${endValid ? `End: ${endValid.date} rank ${endValid.ranking}` : 'End: no valid rank'}`
+            ].join('\n');
+
+    const rowsForPrompt = (() => {
+        const maxRows = 140;
+        if (safeEntries.length <= maxRows) return safeEntries;
+        const head = safeEntries.slice(0, 40);
+        const tail = safeEntries.slice(-100);
+        return [...head, ...tail];
+    })();
+
+    const dataSummary = [
+        header,
+        '',
+        ...(safeEntries.length > rowsForPrompt.length
+            ? [language === 'ru'
+                ? `Показаны первые ${Math.min(40, safeEntries.length)} строк и последние ${Math.min(100, safeEntries.length)} строк (для экономии токенов).`
+                : `Showing first ${Math.min(40, safeEntries.length)} and last ${Math.min(100, safeEntries.length)} rows (to reduce tokens).`,
+            '']
+            : []),
+        ...rowsForPrompt.map(e => {
+            const rank = Number.isFinite(e.ranking) ? e.ranking : 0;
+            const installs = Number.isFinite(e.installs) ? e.installs : 0;
+            const cpi = Number.isFinite(e.cpi) ? e.cpi : 0;
+            return `Date: ${e.date}, Rank: ${rank}, Installs: ${installs}, CPI: $${cpi}`;
+        })
+    ].join('\n');
 
     try {
         const { data, error } = await withRetry(() => supabase.functions.invoke('openai-proxy', {
