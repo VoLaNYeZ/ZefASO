@@ -48,7 +48,8 @@ import {
     Sun,
     Moon,
     Languages,
-    LogOut
+    LogOut,
+    Bell
 } from 'lucide-react';
 import { INITIAL_DATA } from './constants';
 import { AsoEntry, AppAlias, FilterState, Granularity } from './types';
@@ -64,10 +65,15 @@ import { KeywordSuggester } from './components/KeywordSuggester';
 import { supabase } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
-import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, loadAppAliases, saveAppAliasesForApp, deleteAsoEntriesForAppGroup } from './lib/supabaseService';
+import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, loadAppAliases, saveAppAliasesForApp, deleteAsoEntriesForAppGroup, loadWarningsSettings } from './lib/supabaseService';
 import { fetchSheetData, processSheetData } from './services/googleSheets';
 import { BalancePanel } from './components/BalancePanel';
 import { AppAliasManager } from './components/AppAliasManager';
+import { WarningsPage } from './src/warnings/WarningsPage';
+import { computeWarnings } from './src/warnings/computeWarnings';
+import { addDays, formatDate } from './src/warnings/date';
+import { cloneDefaultWarningsRules } from './src/warnings/defaults';
+import type { WarningRuleId, WarningRuleSetting, WarningsSettings } from './src/warnings/types';
 
 const VIEW_MODE_COOKIE = 'zeyf_view_mode';
 
@@ -85,6 +91,95 @@ const persistViewModeCookie = (mode: 'full' | 'mini' | 'combined') => {
     if (typeof document === 'undefined') return;
     const maxAge = 60 * 60 * 24 * 180; // 180 days
     document.cookie = `${VIEW_MODE_COOKIE}=${encodeURIComponent(mode)}; path=/; max-age=${maxAge}`;
+};
+
+const buildDefaultWarningsSettings = (
+    categories: string[],
+    appKeys: string[],
+    opts?: { monitorEnabledDefault?: boolean; initialized?: boolean }
+): WarningsSettings => {
+    const monitorEnabledDefault = typeof opts?.monitorEnabledDefault === 'boolean' ? opts.monitorEnabledDefault : true;
+    const initialized = typeof opts?.initialized === 'boolean' ? opts.initialized : false;
+
+    const safeCats = (Array.isArray(categories) ? categories : [])
+        .filter(c => typeof c === 'string' && c.trim() && c.trim() !== 'Uncategorized')
+        .map(c => c.trim());
+
+    const folderNames = Array.from(new Set([...safeCats, 'Uncategorized']));
+
+    const folders: Record<string, { monitorEnabled: boolean }> = {};
+    folderNames.forEach(name => {
+        folders[name] = { monitorEnabled: monitorEnabledDefault };
+    });
+
+    const apps: Record<string, { rules: Record<WarningRuleId, WarningRuleSetting> }> = {};
+    (Array.isArray(appKeys) ? appKeys : [])
+        .map(k => (typeof k === 'string' ? k.trim() : ''))
+        .filter(Boolean)
+        .forEach(appKey => {
+            apps[appKey] = { rules: cloneDefaultWarningsRules() };
+        });
+
+    return { initialized, folders, apps };
+};
+
+const mergeWarningsSettings = (saved: WarningsSettings | null | undefined, defaults: WarningsSettings): WarningsSettings => {
+    const mergedFolders: Record<string, { monitorEnabled: boolean }> = { ...(defaults.folders || {}) };
+    Object.keys(saved?.folders || {}).forEach(folder => {
+        const savedEnabled = saved?.folders?.[folder]?.monitorEnabled;
+        const fallback = mergedFolders[folder]?.monitorEnabled ?? true;
+        mergedFolders[folder] = { monitorEnabled: typeof savedEnabled === 'boolean' ? savedEnabled : fallback };
+    });
+
+    const allAppKeys = new Set<string>([
+        ...Object.keys(defaults.apps || {}),
+        ...Object.keys(saved?.apps || {})
+    ]);
+
+    const mergedApps: Record<string, { rules: Record<WarningRuleId, WarningRuleSetting> }> = {};
+
+    allAppKeys.forEach(appKey => {
+        if (!appKey) return;
+
+        const baseRules: Record<string, any> = cloneDefaultWarningsRules();
+        const defaultRules: Record<string, any> = (defaults.apps?.[appKey]?.rules as any) || {};
+        const savedRules: Record<string, any> = (saved?.apps?.[appKey]?.rules as any) || {};
+
+        Object.keys(defaultRules).forEach(ruleId => {
+            const cur = baseRules[ruleId] || {};
+            const incoming = defaultRules[ruleId] || {};
+            baseRules[ruleId] = {
+                ...cur,
+                ...incoming,
+                params: { ...(cur.params || {}), ...(incoming.params || {}) }
+            };
+        });
+
+        Object.keys(savedRules).forEach(ruleId => {
+            const cur = baseRules[ruleId] || { enabled: true };
+            const incoming = savedRules[ruleId] || {};
+            baseRules[ruleId] = {
+                ...cur,
+                ...incoming,
+                enabled: typeof incoming.enabled === 'boolean' ? incoming.enabled : cur.enabled,
+                params: { ...(cur.params || {}), ...(incoming.params || {}) }
+            };
+        });
+
+        mergedApps[appKey] = {
+            ...(defaults.apps?.[appKey] || {}),
+            ...(saved?.apps?.[appKey] || {}),
+            rules: baseRules as any
+        };
+    });
+
+    const out: WarningsSettings = {
+        initialized: typeof saved?.initialized === 'boolean' ? saved.initialized : defaults.initialized,
+        folders: mergedFolders,
+        apps: mergedApps
+    };
+    if (saved?.ignored) out.ignored = saved.ignored;
+    return out;
 };
 
 const App = () => {
@@ -116,6 +211,9 @@ const App = () => {
     const [categories, setCategories] = useState<string[]>(['General']);
     const [collapsedCategories, setCollapsedCategories] = useState<string[]>([]);
     const [appCategoryMap, setAppCategoryMap] = useState<Record<string, string>>({});
+    const [warningsSettings, setWarningsSettings] = useState<WarningsSettings>(() =>
+        buildDefaultWarningsSettings(['General'], [], { monitorEnabledDefault: false, initialized: false })
+    );
     const [lang, setLang] = useState<'en' | 'ru'>('en');
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
     const [isSyncConfigured, setIsSyncConfigured] = useState(false);
@@ -149,6 +247,7 @@ const App = () => {
             hasLoadedData.current = false;
             currentUserId.current = null;
             hasUserAddedData.current = false;
+            setWarningsSettings(buildDefaultWarningsSettings(['General'], [], { monitorEnabledDefault: false, initialized: false }));
             return;
         }
 
@@ -162,14 +261,15 @@ const App = () => {
         const loadInitialData = async () => {
             setDataLoading(true);
             try {
-                const [asoDataRaw, appSettings, userPrefs, hasSyncConfig, isExistingUser, syncResult, aliases] = await Promise.all([
+                const [asoDataRaw, appSettings, userPrefs, hasSyncConfig, isExistingUser, syncResult, aliases, savedWarningsSettings] = await Promise.all([
                     loadAsoData(),
                     loadAppSettings(),
                     loadUserPreferences(),
                     checkGoogleSheetsSyncExists(),
                     checkIsExistingUser(),
                     supabase.from('google_sheets_sync').select('last_synced_at').eq('user_id', userId).maybeSingle(),
-                    loadAppAliases()
+                    loadAppAliases(),
+                    loadWarningsSettings()
                 ]);
 
                 const testAppNames = new Set(['SecretBen', 'FitnessPro']);
@@ -181,6 +281,27 @@ const App = () => {
                 }
 
                 const shouldHydrateData = !hasUserAddedData.current && dataRef.current.length === 0;
+
+                const dataForWarningsDefaults = (() => {
+                    if (!shouldHydrateData) return dataRef.current;
+                    if (asoData.length > 0) return asoData;
+                    if (!hasSyncConfig && !isExistingUser) return INITIAL_DATA;
+                    return [];
+                })();
+
+                const appKeysForWarnings = Array.from(new Set<string>(
+                    dataForWarningsDefaults
+                        .map(d => (d.appGroup || d.appName))
+                        .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+                ));
+
+                const hasSavedWarnings = !!savedWarningsSettings;
+                const defaultWarnings = buildDefaultWarningsSettings(appSettings.categories, appKeysForWarnings, {
+                    monitorEnabledDefault: hasSavedWarnings,
+                    initialized: hasSavedWarnings
+                });
+                const mergedWarnings = mergeWarningsSettings(savedWarningsSettings, defaultWarnings);
+                setWarningsSettings(mergedWarnings);
 
                 // Only show INITIAL_DATA if this is a brand new user:
                 // 1. No data loaded AND
@@ -336,7 +457,7 @@ const App = () => {
     }, [lang]);
 
     // -- UI State --
-    const [currentPage, setCurrentPage] = useState<'dashboard' | 'overview' | 'lab'>('overview');
+    const [currentPage, setCurrentPage] = useState<'dashboard' | 'overview' | 'lab' | 'warnings'>('overview');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -453,12 +574,62 @@ const App = () => {
     const activeApps = useMemo(() => uniqueApps.filter(app => !hiddenApps.includes(app)), [uniqueApps, hiddenApps]);
     const archivedAppsList = useMemo(() => uniqueApps.filter(app => hiddenApps.includes(app)), [uniqueApps, hiddenApps]);
 
+    useEffect(() => {
+        const defaults = buildDefaultWarningsSettings(categories, uniqueApps, {
+            monitorEnabledDefault: !!warningsSettings.initialized,
+            initialized: !!warningsSettings.initialized
+        });
+        setWarningsSettings(prev => mergeWarningsSettings(prev, defaults));
+    }, [categories, uniqueApps, warningsSettings.initialized]);
+
     // Create a Set of existing composite keys for quick duplicate checking
     const existingDataKeys = useMemo(() => {
         return new Set(data.map(item => `${item.date}-${item.appId}-${item.geo}-${item.keyword}`));
     }, [data]);
 
     const totalInstallCost = useMemo(() => data.reduce((sum, entry) => sum + (entry.installs * (entry.cpi || 0)), 0), [data]);
+
+    const todayLocal = formatDate(new Date());
+    const recentInstallSpend7d = useMemo(() => {
+        const end = todayLocal;
+        const start = addDays(end, -6);
+        let sum = 0;
+        const spendDates = new Set<string>();
+        for (const entry of data) {
+            const dateStr = typeof entry?.date === 'string' ? entry.date : '';
+            if (!dateStr || dateStr < start || dateStr > end) continue;
+            const installs = typeof entry.installs === 'number' && Number.isFinite(entry.installs) ? entry.installs : 0;
+            const cpi = typeof entry.cpi === 'number' && Number.isFinite(entry.cpi) ? entry.cpi : 0;
+            const cost = installs * cpi;
+            if (Number.isFinite(cost) && cost > 0) {
+                sum += cost;
+                spendDates.add(dateStr);
+            }
+        }
+        if (!Number.isFinite(sum)) return 0;
+        return {
+            sum: Math.max(0, sum),
+            dates: Array.from(spendDates).sort()
+        };
+    }, [data, todayLocal]);
+
+    const warningsSummary = useMemo(() => {
+        return computeWarnings({
+            rows: data,
+            settings: warningsSettings,
+            categories,
+            appCategoryMap,
+            hiddenApps,
+            today: todayLocal,
+            lang
+        });
+    }, [data, warningsSettings, categories, appCategoryMap, hiddenApps, todayLocal, lang]);
+
+    const warningsCount = useMemo(() => {
+        const raw = warningsSummary?.counts?.total ?? 0;
+        if (!Number.isFinite(raw)) return 0;
+        return Math.max(0, Math.trunc(raw));
+    }, [warningsSummary]);
 
     // Group Active Apps by Category
     const groupedApps = useMemo(() => {
@@ -1425,7 +1596,13 @@ const App = () => {
                 </div>
                 <div className="flex items-center gap-2 pr-3">
                     <div className="shrink-0">
-                        <BalancePanel session={session} totalInstallCost={totalInstallCost} />
+                        <BalancePanel
+                            session={session}
+                            totalInstallCost={totalInstallCost}
+                            recentInstallSpend7d={recentInstallSpend7d.sum}
+                            recentInstallSpendDates7d={recentInstallSpend7d.dates}
+                            lang={lang}
+                        />
                     </div>
                     <button onClick={() => setIsSidebarOpen(false)} className="shrink-0 md:hidden">
                         <Menu size={20} />
@@ -1449,20 +1626,43 @@ const App = () => {
                         </div>
                     </button>
 
-                    {/* The Lab Button */}
-                    <button
-                        onClick={() => setCurrentPage('lab')}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-left ${currentPage === 'lab'
-                            ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-lg'
-                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                            }`}
-                    >
-                        <FlaskConical size={20} className="shrink-0" />
-                        <div className="flex flex-col">
-                            <span className="font-bold leading-none">{t.theLab}</span>
-                            <span className={`text-[10px] mt-1 ${currentPage === 'lab' ? 'text-indigo-100' : 'text-slate-500'}`}>{t.labSub}</span>
-                        </div>
-                    </button>
+                    {/* The Lab Button + Warnings */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setCurrentPage('lab')}
+                            className={`flex-1 min-w-0 min-h-[2.75rem] flex items-center gap-2.5 px-4 py-2.5 rounded-lg transition-all text-left ${currentPage === 'lab'
+                                ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-lg'
+                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                                }`}
+                        >
+                            <FlaskConical size={20} className="shrink-0" />
+                            <div className="flex flex-col min-w-0">
+                                <span className={`font-bold leading-none truncate ${lang === 'ru' ? 'text-[13px]' : ''}`}>{t.theLab}</span>
+                                <span className={`text-[10px] mt-1 truncate ${currentPage === 'lab' ? 'text-indigo-100' : 'text-slate-500'}`}>{t.labSub}</span>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                setCurrentPage('warnings');
+                                if (window.innerWidth < 768) {
+                                    setIsSidebarOpen(false);
+                                }
+                            }}
+                            className={`relative shrink-0 w-12 min-h-[3rem] flex items-center justify-center rounded-xl border transition-all active:scale-95 ${currentPage === 'warnings'
+                                ? 'bg-rose-600 text-white border-rose-500/40 shadow-lg shadow-rose-900/20'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border-slate-700'
+                                }`}
+                            title={t.warnings || 'Warnings'}
+                        >
+                            <Bell size={22} />
+                            {warningsCount > 0 && (
+                                <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow">
+                                    {warningsCount > 99 ? '99+' : warningsCount}
+                                </span>
+                            )}
+                        </button>
+                    </div>
 
                     <div className="flex items-center gap-3 px-3 mt-4 mb-1">
                         <div className="h-px bg-slate-800 flex-1"></div>
@@ -1869,25 +2069,42 @@ const App = () => {
                             getCountryFlag={getCountryFlag}
                             getStoreUrl={getStoreUrl}
                             theme={theme}
-                            t={t}
-                        />
-                    </div>
-                ) : currentPage === 'lab' ? (
-                    <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
-                        <ComparisonDashboard
-                            data={data}
-                            activeApps={activeApps}
-                            appIdLabelsByGroup={appIdLabelsByGroup}
-                            getCountryFlag={getCountryFlag}
-                            theme={theme}
-                            t={t}
-                        />
-                    </div>
-                ) : (
-                    <>
-                        {/* Dashboard Header */}
-                        <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm z-20 transition-colors duration-200">
-                            <div className="px-4 py-3 pt-16 md:pt-4">
+                             t={t}
+                         />
+                     </div>
+                 ) : currentPage === 'lab' ? (
+                     <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
+                         <ComparisonDashboard
+                             data={data}
+                             activeApps={activeApps}
+                             appIdLabelsByGroup={appIdLabelsByGroup}
+                             getCountryFlag={getCountryFlag}
+                             theme={theme}
+                             t={t}
+                         />
+                     </div>
+                 ) : currentPage === 'warnings' ? (
+                     <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
+                         <WarningsPage
+                             rows={data}
+                             categories={categories}
+                             appCategoryMap={appCategoryMap}
+                             hiddenApps={hiddenApps}
+                             appIcons={appIcons}
+                             getCountryFlag={getCountryFlag}
+                             lang={lang}
+                             t={t}
+                             warningsSettings={warningsSettings}
+                             setWarningsSettings={setWarningsSettings}
+                             setCurrentPage={setCurrentPage}
+                             setFilters={setFilters}
+                         />
+                     </div>
+                 ) : (
+                     <>
+                         {/* Dashboard Header */}
+                         <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm z-20 transition-colors duration-200">
+                             <div className="px-4 py-3 pt-16 md:pt-4">
                                 <div className="flex flex-row items-center justify-between gap-2 mb-3">
                                     <div className="min-w-0 flex-1">
                                         <h1 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 md:gap-3 truncate">
@@ -2075,9 +2292,9 @@ const App = () => {
                                     </div>
 
                                     {/* Date Picker & Reset Wrapper */}
-                                    <div className="col-span-2 lg:col-span-1 lg:ml-auto flex items-center gap-2 w-full lg:w-auto">
+                                    <div className="col-span-2 lg:col-span-1 lg:ml-auto flex items-center gap-2 w-full lg:w-auto min-w-0">
                                         {/* Date Range Picker */}
-                                        <div className="flex-1 lg:w-auto">
+                                        <div className="flex-1 lg:w-auto min-w-0">
                                             <DateRangePicker
                                                 startDate={filters.startDate}
                                                 endDate={filters.endDate}

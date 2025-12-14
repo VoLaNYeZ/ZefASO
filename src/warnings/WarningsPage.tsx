@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronRight, Info, OctagonAlert, Settings } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronRight, Info, Loader2, OctagonAlert, Settings } from 'lucide-react';
 import type { FilterState } from '../../types';
 import type { AsoRow, ComputeOutput } from './computeWarnings';
 import { computeWarnings } from './computeWarnings';
@@ -39,7 +39,9 @@ const folderOf = (appKey: string, appCategoryMap: Record<string, string>): strin
 
 const getMonitorEnabled = (settings: WarningsSettings, folder: string): boolean => {
   const value = settings.folders?.[folder]?.monitorEnabled;
-  return typeof value === 'boolean' ? value : true;
+  if (typeof value === 'boolean') return value;
+  if (settings?.initialized === false) return false;
+  return true;
 };
 
 const safeInt = (value: unknown): number => (Number.isFinite(value as any) ? Math.max(0, Math.trunc(value as any)) : 0);
@@ -61,6 +63,9 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
   setFilters,
 }) => {
   const today = formatDate(new Date());
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savingFolders, setSavingFolders] = useState<Record<string, boolean>>({});
+  const mountedRef = useRef(true);
 
   const computed = useMemo<ComputeOutput>(() => {
     return computeWarnings({
@@ -158,22 +163,58 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
   }, [folderOrder, appsByFolder, computed.byFolder]);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveOpIdRef = useRef(0);
+  const saveErrorHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveHardTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (saveErrorHideTimeoutRef.current) clearTimeout(saveErrorHideTimeoutRef.current);
+      if (saveHardTimeoutRef.current) clearTimeout(saveHardTimeoutRef.current);
     };
   }, []);
 
-  const scheduleSave = (next: WarningsSettings) => {
+  const scheduleSave = (next: WarningsSettings, folderKey?: string) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    if (saveHardTimeoutRef.current) clearTimeout(saveHardTimeoutRef.current);
+    const opId = ++saveOpIdRef.current;
+
+    saveHardTimeoutRef.current = setTimeout(() => {
+      if (!mountedRef.current) return;
+      if (saveOpIdRef.current !== opId) return;
+      setSavingFolders({});
+      const msg = lang === 'ru' ? 'Сохранение занимает слишком долго' : 'Saving is taking too long';
+      setSaveError(msg);
+      if (saveErrorHideTimeoutRef.current) clearTimeout(saveErrorHideTimeoutRef.current);
+      saveErrorHideTimeoutRef.current = setTimeout(() => setSaveError(null), 6000);
+    }, 12000);
+
     saveTimeoutRef.current = setTimeout(() => {
-      saveWarningsSettings(next).catch((err) => {
-        console.warn('Failed to save warnings settings:', err);
-      });
+      saveWarningsSettings(next)
+        .then(() => {
+          if (!mountedRef.current) return;
+          if (saveHardTimeoutRef.current) clearTimeout(saveHardTimeoutRef.current);
+          if (saveOpIdRef.current === opId) setSaveError(null);
+          if (saveOpIdRef.current === opId) setSavingFolders({});
+          else if (folderKey) setSavingFolders((prev) => ({ ...prev, [folderKey]: false }));
+        })
+        .catch((err) => {
+          console.warn('Failed to save warnings settings:', err);
+          if (!mountedRef.current) return;
+          if (saveHardTimeoutRef.current) clearTimeout(saveHardTimeoutRef.current);
+          if (saveOpIdRef.current !== opId) return;
+          const msg = lang === 'ru' ? 'Не удалось сохранить настройки' : 'Failed to save settings';
+          setSaveError(msg);
+          setSavingFolders({});
+          if (saveErrorHideTimeoutRef.current) clearTimeout(saveErrorHideTimeoutRef.current);
+          saveErrorHideTimeoutRef.current = setTimeout(() => setSaveError(null), 6000);
+        });
     }, 650);
   };
 
   const toggleFolderMonitor = (folder: string, enabled: boolean) => {
+    setSavingFolders((prev) => ({ ...prev, [folder]: true }));
     setWarningsSettings((prev) => {
       const next: WarningsSettings = {
         ...prev,
@@ -183,7 +224,7 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
           [folder]: { monitorEnabled: enabled },
         },
       };
-      scheduleSave(next);
+      scheduleSave(next, folder);
       return next;
     });
   };
@@ -256,6 +297,12 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
         </div>
       </div>
 
+      {saveError && (
+        <div className="mb-4 rounded-xl border border-amber-300/60 dark:border-amber-500/30 bg-amber-50/70 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+          {saveError}
+        </div>
+      )}
+
       <div className="space-y-4">
         {folderOrder.map((folder) => {
           const monitorEnabled = getMonitorEnabled(warningsSettings, folder);
@@ -265,10 +312,10 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
 
           return (
             <div key={folder} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-800">
-                <button
-                  onClick={() => setExpandedFolders((prev) => ({ ...prev, [folder]: !expanded }))}
-                  className="flex items-center gap-2 min-w-0 text-left"
+                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+                  <button
+                    onClick={() => setExpandedFolders((prev) => ({ ...prev, [folder]: !expanded }))}
+                    className="flex items-center gap-2 min-w-0 text-left"
                   title={expanded ? (lang === 'ru' ? 'Свернуть' : 'Collapse') : (lang === 'ru' ? 'Развернуть' : 'Expand')}
                 >
                   {expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
@@ -282,13 +329,22 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
                   <input
                     type="checkbox"
                     checked={monitorEnabled}
+                    disabled={!!savingFolders[folder]}
                     onChange={(e) => toggleFolderMonitor(folder, e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950"
+                      className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 accent-indigo-600 dark:accent-indigo-400 disabled:opacity-60 disabled:cursor-not-allowed"
                     />
                     <span className="hidden sm:inline">{t.warningsMonitorFolder || 'Monitor folder'}</span>
                     <span className="sm:hidden text-[11px] font-semibold">
                       {lang === 'ru' ? 'Монитор' : 'Monitor'}
                     </span>
+                    {savingFolders[folder] && (
+                      <span
+                        className="inline-flex items-center justify-center w-4 h-4 text-slate-500 dark:text-slate-300"
+                        title={lang === 'ru' ? 'Сохраняем' : 'Saving'}
+                      >
+                        <Loader2 size={14} className="animate-spin" />
+                      </span>
+                    )}
                   </label>
                 </div>
 
@@ -438,30 +494,34 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
                                       title={`${w.ruleId} - ${w.createdFromDate}`}
                                     >
                                       <div className="flex items-start gap-2 min-w-0">
-                                        <div className="flex items-center gap-2 shrink-0 pt-[1px]">
-                                          {w.severity === 'critical' ? (
-                                            <OctagonAlert size={18} className="text-rose-600 dark:text-rose-300" />
-                                          ) : w.severity === 'warning' ? (
-                                            <AlertTriangle size={18} className="text-amber-600 dark:text-amber-300" />
-                                          ) : (
-                                            <Info size={18} className="text-sky-600 dark:text-sky-300" />
-                                          )}
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          <span className="w-5 h-5 flex items-center justify-center">
+                                            {w.severity === 'critical' ? (
+                                              <OctagonAlert size={18} className="text-rose-600 dark:text-rose-300" />
+                                            ) : w.severity === 'warning' ? (
+                                              <AlertTriangle size={18} className="text-amber-600 dark:text-amber-300" />
+                                            ) : (
+                                              <Info size={18} className="text-sky-600 dark:text-sky-300" />
+                                            )}
+                                          </span>
 
                                           {showGeoAll ? (
                                             <span className="px-2 py-1 rounded-md text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
                                               {labelForAll(lang)}
                                             </span>
                                           ) : (
-                                            <img
-                                              src={flagSrc}
-                                              alt={w.geo}
-                                              className="w-5 h-3.5 object-contain shadow-sm rounded-[2px]"
-                                            />
+                                            <span className="w-6 h-5 flex items-center justify-center">
+                                              <img
+                                                src={flagSrc}
+                                                alt={w.geo}
+                                                className="w-5 h-3.5 object-contain shadow-sm rounded-[2px]"
+                                              />
+                                            </span>
                                           )}
 
                                           <span
                                             className={
-                                              'max-w-[110px] sm:max-w-[160px] px-2 py-1 rounded-md text-[11px] font-bold border truncate ' +
+                                              'inline-flex items-center flex-none max-w-[140px] sm:max-w-[200px] px-2 py-1 rounded-md text-[11px] font-bold border truncate ' +
                                               (showKeywordAll
                                                 ? 'bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
                                                 : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700')

@@ -10,6 +10,7 @@ import {
     AlertTriangle,
     Sparkles,
     ArrowLeft,
+    ArrowRight,
     Globe,
     Type,
     LayoutTemplate,
@@ -630,76 +631,66 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                         <DollarSign size={180} strokeWidth={1} />
                     </div>
 
-                    <div className="absolute inset-0 z-10 [perspective:1200px]">
-                        <div
-                            className={`relative h-full w-full transition-transform duration-500 [transform-style:preserve-3d] [will-change:transform] ${isTotalSpendFlipped ? '[transform:rotateY(180deg)]' : ''}`}
-                        >
-                            <div
-                                className={`absolute inset-0 [backface-visibility:hidden] ${isTotalSpendFlipped ? 'pointer-events-none' : 'pointer-events-auto'}`}
-                            >
-                                <div className="flex items-center gap-2 mb-2 text-indigo-100 font-bold uppercase tracking-wider text-sm">
-                                    <DollarSign size={16} /> {t.totalSpend}
-                                </div>
-                                <div className="text-6xl sm:text-7xl font-black tracking-tighter tabular-nums">
-                                    {currencySymbol}{grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                </div>
-                                <p className="mt-4 text-indigo-100 font-medium opacity-90">
-                                    {t.investedAcross} {activeAppsCount} {t.appsInPeriod}
-                                </p>
+                    <div className={`relative z-10 transition-opacity duration-300 ${isTotalSpendFlipped ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                        <div className="flex items-center gap-2 mb-2 text-indigo-100 font-bold uppercase tracking-wider text-sm">
+                            <DollarSign size={16} /> {t.totalSpend}
+                        </div>
+                        <div className="text-6xl sm:text-7xl font-black tracking-tighter tabular-nums">
+                            {currencySymbol}{grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </div>
+                        <p className="mt-4 text-indigo-100 font-medium opacity-90">
+                            {t.investedAcross} {activeAppsCount} {t.appsInPeriod}
+                        </p>
+                    </div>
+
+                    <div
+                        className={`absolute left-8 right-8 top-8 bottom-[30px] z-10 min-h-0 grid grid-rows-[auto_auto_1fr] gap-3 transition-opacity duration-300 ${isTotalSpendFlipped ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                    >
+                        <div className="flex items-center justify-between gap-3 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0 text-indigo-100 font-bold uppercase tracking-wider text-sm">
+                                <DollarSign size={16} />
+                                <span className="truncate">{t.spentIn7d || 'Spent in 7d'}</span>
                             </div>
+                            <div className="text-[11px] font-bold text-indigo-100/90 tabular-nums whitespace-nowrap">
+                                ({currencySymbol}{grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
+                            </div>
+                        </div>
 
-                            <div
-                                className={`absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] ${isTotalSpendFlipped ? 'pointer-events-auto' : 'pointer-events-none'}`}
-                            >
-                                <div className="absolute left-8 right-8 top-8 bottom-[30px] min-h-0 grid grid-rows-[auto_auto_1fr] gap-3">
-                                    <div className="flex items-center justify-between gap-3 min-w-0">
-                                        <div className="flex items-center gap-2 min-w-0 text-indigo-100 font-bold uppercase tracking-wider text-sm">
-                                            <DollarSign size={16} />
-                                            <span className="truncate">{t.spentIn7d || 'Spent in 7d'}</span>
-                                        </div>
-                                        <div className="text-[11px] font-bold text-indigo-100/90 tabular-nums whitespace-nowrap">
-                                            ({currencySymbol}{grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
-                                        </div>
-                                    </div>
+                        <div className="text-xl sm:text-2xl font-black tracking-tighter tabular-nums">
+                            {currencySymbol}{spend7dSeries.total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </div>
 
-                                    <div className="text-xl sm:text-2xl font-black tracking-tighter tabular-nums">
-                                        {currencySymbol}{spend7dSeries.total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                    </div>
+                        <div className="h-full min-h-0 rounded-2xl bg-white/10 border border-white/15 px-2 pb-2 pt-4 overflow-hidden">
+                            <div className="h-full flex items-end gap-1.5">
+                                {spend7dSeries.points.map((p, idx) => {
+                                    const prev = idx === 0 ? p.spend : spend7dSeries.points[idx - 1].spend;
+                                    const barPctRaw = (Math.max(0, p.spend) / spend7dSeries.maxSpend) * 100;
+                                    const barPct = Number.isFinite(barPctRaw) ? Math.min(100, Math.max(0, barPctRaw)) : 0;
+                                    const isUp = p.spend >= prev;
+                                    const color = isUp ? 'bg-rose-200/90' : 'bg-emerald-200/90';
+                                    const valueLabelRaw = formatSpendCompact(p.spend);
+                                    const valueLabel = valueLabelRaw ? `${currencySymbol}${valueLabelRaw}` : '';
 
-                                    <div className="h-full min-h-0 rounded-2xl bg-white/10 border border-white/15 px-2 pb-2 pt-4 overflow-hidden">
-                                        <div className="h-full flex items-end gap-1.5">
-                                            {spend7dSeries.points.map((p, idx) => {
-                                                const prev = idx === 0 ? p.spend : spend7dSeries.points[idx - 1].spend;
-                                                const barPctRaw = (Math.max(0, p.spend) / spend7dSeries.maxSpend) * 100;
-                                                const barPct = Number.isFinite(barPctRaw) ? Math.min(100, Math.max(0, barPctRaw)) : 0;
-                                                const isUp = p.spend >= prev;
-                                                const color = isUp ? 'bg-rose-200/90' : 'bg-emerald-200/90';
-                                                const valueLabelRaw = formatSpendCompact(p.spend);
-                                                const valueLabel = valueLabelRaw ? `${currencySymbol}${valueLabelRaw}` : '';
-
-                                                return (
-                                                    <div key={p.date} className="flex-1 min-w-0 h-full flex flex-col items-center gap-1">
-                                                        <div className="relative w-full flex-1 min-h-0 flex items-end justify-center px-0.5">
-                                                            <div
-                                                                className={`w-[10px] ${color} rounded-sm relative min-h-[2px]`}
-                                                                style={{ height: `${barPct}%` }}
-                                                            >
-                                                                {valueLabel ? (
-                                                                    <div className="absolute left-1/2 -translate-x-1/2 -top-4 text-[8px] font-black leading-[10px] text-white/90 tabular-nums drop-shadow whitespace-nowrap text-center">
-                                                                        {valueLabel}
-                                                                    </div>
-                                                                ) : null}
-                                                            </div>
+                                    return (
+                                        <div key={p.date} className="flex-1 min-w-0 h-full flex flex-col items-center gap-1">
+                                            <div className="relative w-full flex-1 min-h-0 flex items-end justify-center px-0.5">
+                                                <div
+                                                    className={`w-[10px] ${color} rounded-sm relative min-h-[2px]`}
+                                                    style={{ height: `${barPct}%` }}
+                                                >
+                                                    {valueLabel ? (
+                                                        <div className="absolute left-1/2 -translate-x-1/2 -top-4 text-[8px] font-black leading-[10px] text-white/90 tabular-nums drop-shadow whitespace-nowrap text-center">
+                                                            {valueLabel}
                                                         </div>
-                                                        <div className="text-[10px] font-bold text-indigo-50/80 tabular-nums">
-                                                            {p.date.slice(8)}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                            <div className="text-[10px] font-bold text-indigo-50/80 tabular-nums">
+                                                {p.date.slice(8)}
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
@@ -712,9 +703,10 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                         <button
                             type="button"
                             onClick={() => setIsTotalSpendFlipped(true)}
-                            className="absolute bottom-0 left-1/2 -translate-x-1/2 inline-flex items-center justify-center h-7 gap-2 px-3 rounded-t-xl rounded-b-none bg-white/12 hover:bg-white/18 border border-white/25 border-b-0 text-white/95 text-xs font-black transition-colors backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.10)] z-20"
+                            className="absolute bottom-0 left-1/2 -translate-x-1/2 inline-flex items-center justify-center h-7 gap-2 px-4 rounded-t-xl rounded-b-none bg-white/12 hover:bg-white/18 border border-white/25 border-b-0 text-white/95 text-xs font-black transition-colors backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.10)] z-20"
                         >
                             {t.last7DaysPill || 'Last 7d'}
+                            <ArrowRight size={14} />
                         </button>
                     ) : (
                         <button

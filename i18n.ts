@@ -3,6 +3,9 @@ export const translations = {
         // Navigation & General
         overview: 'Overview',
         theLab: 'The Lab',
+        warnings: 'Warnings',
+        back: 'Back',
+        close: 'Close',
         newFolder: 'New Folder',
         noActiveApps: 'No active apps',
         empty: 'Empty',
@@ -21,6 +24,8 @@ export const translations = {
         today: 'Today',
         yesterday: 'Yesterday',
         last7Days: 'Last 7 Days',
+        last7DaysShort: '7d',
+        last7DaysPill: 'Last 7d',
         last30Days: 'Last 30 Days',
         last3Months: 'Last 3 Months',
         thisMonth: 'This Month',
@@ -28,6 +33,7 @@ export const translations = {
         allTime: 'All Time',
         applyRange: 'Apply Range',
         cancel: 'Cancel',
+        save: 'Save',
         dateHelpHint: 'Tip: Click a day once to start the interval, click it twice to set that single day as your range.',
 
         // AI & Analysis
@@ -54,6 +60,7 @@ export const translations = {
 
         // Overview Dashboard
         totalSpend: 'Total Spend',
+        spentIn7d: 'Spent in 7d',
         activeApps: 'Active Apps',
         investedAcross: 'Invested across',
         appsInPeriod: 'apps in this period.',
@@ -156,6 +163,17 @@ export const translations = {
         overviewDescription: 'Global performance across all your applications.',
         labDescription: 'Experiment, compare, and build optimal growth models.',
 
+        // Warnings
+        warningsBack: 'Back',
+        warningsActive: 'Active warnings',
+        warningsMonitorFolder: 'Monitor folder',
+        warningsMonitoringOff: 'Monitoring off',
+        warningsNoWarnings: 'No warnings',
+        warningsNoAppsInFolder: 'No apps in this folder.',
+        warningsSettings: 'Warnings settings',
+        warningsEnabled: 'Enabled',
+        warningsOff: 'Off',
+
         // Dashboard Stats
         dailyInstalls: 'Daily Installs',
         avgRanking: 'Avg. Ranking',
@@ -194,6 +212,9 @@ export const translations = {
         // Navigation & General
         overview: 'Обзор',
         theLab: 'Лаборатория',
+        warnings: 'Предупреждения',
+        back: 'Назад',
+        close: 'Закрыть',
         newFolder: 'Новая папка',
         noActiveApps: 'Нет активных приложений',
         empty: 'Пусто',
@@ -212,6 +233,8 @@ export const translations = {
         today: 'Сегодня',
         yesterday: 'Вчера',
         last7Days: 'Последние 7 дней',
+        last7DaysShort: '7 дней',
+        last7DaysPill: '7д',
         last30Days: 'Последние 30 дней',
         last3Months: 'Последние 3 месяца',
         thisMonth: 'Этот месяц',
@@ -219,6 +242,7 @@ export const translations = {
         allTime: 'Все время',
         applyRange: 'Применить',
         cancel: 'Отмена',
+        save: 'Сохранить',
         dateHelpHint: 'Нажмите на день один раз, чтобы начать диапазон. Нажмите дважды на тот же день, чтобы выбрать только его.',
 
         // AI & Analysis
@@ -245,6 +269,7 @@ export const translations = {
 
         // Overview Dashboard
         totalSpend: 'Общий расход',
+        spentIn7d: 'Потрачено за 7д',
         activeApps: 'Активные приложения',
         investedAcross: 'Инвестировано в',
         appsInPeriod: 'приложений за этот период.',
@@ -346,6 +371,17 @@ export const translations = {
         labSub: 'Сравнение и оптимизация',
         overviewDescription: 'Глобальная производительность всех ваших приложений.',
         labDescription: 'Экспериментируем, сравниваем и создаем оптимальные модели роста.',
+
+        // Warnings
+        warningsBack: 'Назад',
+        warningsActive: 'Активные предупреждения',
+        warningsMonitorFolder: 'Отслеживать папку',
+        warningsMonitoringOff: 'Мониторинг выключен',
+        warningsNoWarnings: 'Нет предупреждений',
+        warningsNoAppsInFolder: 'Нет приложений в папке.',
+        warningsSettings: 'Настройки предупреждений',
+        warningsEnabled: 'Включено',
+        warningsOff: 'Выключено',
 
         // Dashboard Stats
         dailyInstalls: 'По ранкам',

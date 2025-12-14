@@ -18,6 +18,7 @@ export const INITIAL_DATA: AsoEntry[] = [
     id: `sb-us-${i}`,
     date: formatDate(subDays(today, 13 - i)),
     appName: 'SecretBen',
+    appGroup: 'SecretBen',
     geo: 'US',
     appId: 'SecretBen 1749590447', // Composite Name + ID
     keyword: 'Secret Ben',
@@ -30,6 +31,7 @@ export const INITIAL_DATA: AsoEntry[] = [
     id: `sb-us-kw2-${i}`,
     date: formatDate(subDays(today, 13 - i)),
     appName: 'SecretBen',
+    appGroup: 'SecretBen',
     geo: 'US',
     appId: 'SecretBen 1749590447',
     keyword: 'Hidden Friend',
@@ -42,6 +44,7 @@ export const INITIAL_DATA: AsoEntry[] = [
     id: `fp-uk-${i}`,
     date: formatDate(subDays(today, 13 - i)),
     appName: 'FitnessPro',
+    appGroup: 'FitnessPro',
     geo: 'UK',
     appId: 'FitnessPro 999888777',
     keyword: 'Home Workout',

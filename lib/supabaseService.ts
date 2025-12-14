@@ -1,11 +1,17 @@
 import { supabase } from './supabase';
 import { AsoEntry } from '../types';
+import type { WarningsSettings } from '../src/warnings/types';
 
 // Get the current user ID
 const getUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
     return user.id;
+};
+
+const getUserIdOrNull = async (): Promise<string | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    return user?.id ?? null;
 };
 
 // ============================================
@@ -183,7 +189,7 @@ export const loadAppSettings = async (): Promise<AppSettings> => {
         .from('app_settings')
         .select('*')
         .eq('user_id', userId)
-        .order('updated_at', { ascending: false, nullsLast: true })
+        .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -272,7 +278,7 @@ export const loadUserPreferences = async (): Promise<UserPreferences> => {
         .from('user_preferences')
         .select('*')
         .eq('user_id', userId)
-        .order('updated_at', { ascending: false, nullsLast: true })
+        .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -615,5 +621,52 @@ export const fetchCountryRankings = async (): Promise<Record<string, CountryRank
     } catch (err) {
         console.error('Unexpected error in fetchCountryRankings:', err);
         return {};
+    }
+};
+
+// ============================================
+// Warnings Settings
+// ============================================
+
+export const loadWarningsSettings = async (): Promise<WarningsSettings | null> => {
+    const userId = await getUserIdOrNull();
+    if (!userId) return null;
+
+    try {
+        const { data, error } = await supabase
+            .from('warnings_settings')
+            .select('settings')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (error) {
+            console.warn('Error loading warnings settings:', error);
+            return null;
+        }
+
+        return (data?.settings as WarningsSettings) || null;
+    } catch (err) {
+        console.warn('Unexpected error loading warnings settings:', err);
+        return null;
+    }
+};
+
+export const saveWarningsSettings = async (settings: WarningsSettings): Promise<void> => {
+    const userId = await getUserIdOrNull();
+    if (!userId) throw new Error('Not authenticated');
+
+    const { error } = await supabase
+        .from('warnings_settings')
+        .upsert({
+            user_id: userId,
+            settings,
+            updated_at: new Date().toISOString()
+        }, {
+            onConflict: 'user_id'
+        });
+
+    if (error) {
+        console.error('Error saving warnings settings:', error);
+        throw error;
     }
 };

@@ -231,14 +231,30 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
     const todayStr = toStr(new Date());
     if (!startDate) return t.allTime;
 
-    const startLabel = new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const isNow = !endDate || endDate === todayStr;
-    const endLabel = isNow
-      ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">Now</span>
-      : new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const start = new Date(startDate);
+    const end = endDate ? new Date(endDate) : null;
+    const hasEnd = !!endDate && !!end;
+    const sameDay = hasEnd && endDate === startDate;
+    const sameYear = hasEnd && !sameDay && start.getFullYear() === end!.getFullYear();
+
+    const startLabel =
+      sameYear
+        ? start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    const isNow = !!endDate && endDate === todayStr;
+    const endLabel = isNow ? (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 whitespace-nowrap">
+        Now
+      </span>
+    ) : hasEnd ? (
+      end!.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    ) : (
+      start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    );
 
     return (
-      <span className="inline-flex items-center gap-1">
+      <span className="inline-flex items-center gap-1 whitespace-nowrap">
         <span>{startLabel}</span>
         <span className="text-slate-400 dark:text-slate-500">-</span>
         {endLabel}
@@ -259,10 +275,10 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, end
           ${variant === 'compact' ? 'rounded-md' : 'rounded-lg'} 
           font-medium text-slate-700 
           ${variant === 'compact' ? 'dark:text-slate-300' : variant === 'overview' ? 'dark:text-slate-200' : 'dark:text-slate-200'} 
-          hover:border-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer shadow-sm w-full lg:w-auto`}
+          hover:border-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer shadow-sm w-full min-w-0 overflow-hidden`}
       >
         <CalendarIcon size={16} className="hidden sm:inline text-slate-500 dark:text-slate-400" />
-        <span className="text-center truncate">{formatDisplay()}</span>
+        <span className="text-center min-w-0 flex-1 whitespace-nowrap">{formatDisplay()}</span>
       </button>
 
       {isOpen && (

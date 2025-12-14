@@ -7,6 +7,9 @@ import { createPortal } from 'react-dom';
 interface BalancePanelProps {
     session: Session | null;
     totalInstallCost: number;
+    recentInstallSpend7d?: number;
+    recentInstallSpendDates7d?: string[];
+    lang?: 'en' | 'ru';
 }
 
 const formatCurrency = (value: number) => {
@@ -14,7 +17,32 @@ const formatCurrency = (value: number) => {
     return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
 };
 
-export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstallCost }) => {
+const formatLocalIsoDate = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+};
+
+const addLocalDays = (dateStr: string, deltaDays: number): string => {
+    const parts = dateStr.split('-').map(v => Number.parseInt(v, 10));
+    if (parts.length !== 3 || parts.some(v => !Number.isFinite(v))) return dateStr;
+    const [y, m, d] = parts;
+    const dt = new Date(y, (m || 1) - 1, d || 1);
+    dt.setDate(dt.getDate() + deltaDays);
+    return formatLocalIsoDate(dt);
+};
+
+const pluralRuDays = (count: number): string => {
+    const n = Math.abs(count);
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return 'день';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'дня';
+    return 'дней';
+};
+
+export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstallCost, recentInstallSpend7d, recentInstallSpendDates7d, lang = 'en' }) => {
     const [expanded, setExpanded] = useState(false);
     const [entries, setEntries] = useState<BalanceEntry[]>([]);
     const [loading, setLoading] = useState(false);
@@ -41,10 +69,55 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
         return { balance, deposits, spends };
     }, [entries, totalInstallCost]);
 
+    const balanceRunout = useMemo(() => {
+        const balance = Number.isFinite(totals.balance) ? totals.balance : 0;
+        const today = formatLocalIsoDate(new Date());
+        const start = addLocalDays(today, -6);
+
+        let manualSpend7d = 0;
+        const manualSpendDates = new Set<string>();
+        for (const e of entries) {
+            const dateStr = typeof e.entryDate === 'string' ? e.entryDate : '';
+            if (!dateStr || dateStr < start || dateStr > today) continue;
+            if (typeof e.amount === 'number' && Number.isFinite(e.amount) && e.amount < 0) {
+                manualSpend7d += Math.abs(e.amount);
+                manualSpendDates.add(dateStr);
+            }
+        }
+
+        const installSpend7d =
+            typeof recentInstallSpend7d === 'number' && Number.isFinite(recentInstallSpend7d)
+                ? Math.max(0, recentInstallSpend7d)
+                : 0;
+
+        const totalSpend7d = manualSpend7d + installSpend7d;
+        const avgDailySpend = totalSpend7d / 7;
+        if (!(avgDailySpend > 0) || totalSpend7d < 1) return null;
+
+        const installDates = new Set<string>((Array.isArray(recentInstallSpendDates7d) ? recentInstallSpendDates7d : []).filter((d) => typeof d === 'string' && d));
+        const activeDays = new Set<string>([...installDates, ...manualSpendDates]).size;
+        if (activeDays < 3) return null;
+
+        const daysLeftRaw = balance <= 0 ? 0 : Math.ceil(balance / avgDailySpend);
+        const daysLeft = Number.isFinite(daysLeftRaw) ? Math.max(0, Math.trunc(daysLeftRaw)) : null;
+        if (daysLeft === null || daysLeft > 5) return null;
+
+        return { daysLeft };
+    }, [entries, recentInstallSpend7d, recentInstallSpendDates7d, totals.balance]);
+
+    const [showRunoutTip, setShowRunoutTip] = useState(false);
+    const runoutTipRef = useRef<HTMLDivElement | null>(null);
+    const runoutBtnRef = useRef<HTMLSpanElement | null>(null);
+
+    useEffect(() => {
+        if (!balanceRunout) setShowRunoutTip(false);
+    }, [balanceRunout]);
+
     useEffect(() => {
         if (!session) {
             setEntries([]);
             setExpanded(false);
+            setShowRunoutTip(false);
             return;
         }
 
@@ -57,6 +130,17 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
 
         load();
     }, [session]);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            const path = (e.composedPath && e.composedPath()) || [];
+            const insideBtn = path.includes(runoutBtnRef.current as EventTarget);
+            const insideTip = path.includes(runoutTipRef.current as EventTarget);
+            if (!insideBtn && !insideTip) setShowRunoutTip(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     // Close date picker on outside click
     useEffect(() => {
@@ -168,7 +252,7 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
     };
 
     return (
-        <div className="relative inline-flex shrink-0 min-w-[140px] max-w-[200px]">
+        <div className="relative inline-flex shrink-0 w-fit">
             <button
                 type="button"
                 onClick={() => setExpanded(prev => !prev)}
@@ -184,6 +268,42 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
                 </span>
                 <span className="text-[10px] text-slate-500">{expanded ? '▴' : '▾'}</span>
             </button>
+
+            {balanceRunout && (
+                <div className="absolute -top-1 -right-1 z-50">
+                    <button
+                        ref={runoutBtnRef}
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowRunoutTip(v => !v);
+                        }}
+                        className="relative w-5 h-5 rounded-full bg-rose-500 text-white text-[11px] font-black flex items-center justify-center shadow hover:bg-rose-400 transition-colors"
+                        title={lang === 'ru' ? 'Баланс может скоро закончиться' : 'Balance may run out soon'}
+                    >
+                        !
+                    </button>
+
+                    {showRunoutTip && (
+                        <div
+                            ref={runoutTipRef}
+                            className="absolute right-0 top-full mt-2 w-[220px] max-w-[calc(100vw-32px)] rounded-xl border border-rose-500/20 bg-slate-900/95 backdrop-blur shadow-xl px-3 py-2.5"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="text-[13px] font-semibold text-slate-100 whitespace-nowrap">
+                                {balanceRunout.daysLeft === 0
+                                    ? (lang === 'ru' ? 'Хватит на сегодня' : 'Balance may run out today')
+                                    : (lang === 'ru'
+                                        ? `Хватит на ${balanceRunout.daysLeft} ${pluralRuDays(balanceRunout.daysLeft)}`
+                                        : `Balance may run out in ${balanceRunout.daysLeft} days`)}
+                            </div>
+                            <div className="hidden sm:block mt-1 text-[11px] text-slate-400">
+                                {lang === 'ru' ? 'По тратам за 7 дней' : 'Based on 7d spend'}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {expanded && (
                 <div className="absolute right-2 top-full mt-2 space-y-2 animate-shelf w-[200px] max-w-[calc(100vw-48px)] z-40">

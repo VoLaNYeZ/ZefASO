@@ -25,7 +25,7 @@ export const AppAliasManager: React.FC<AppAliasManagerProps> = ({ appName, appId
     const [success, setSuccess] = useState(false);
 
     useEffect(() => {
-        const byId = new Map(aliases.map(a => [a.appId, a]));
+        const byId = new Map<string, AppAlias>(aliases.map(a => [a.appId, a] as const));
         const initialRows = appIds.map(id => {
             const existing = byId.get(id);
             return {
@@ -175,5 +175,4 @@ export const AppAliasManager: React.FC<AppAliasManagerProps> = ({ appName, appId
         </div>
     );
 };
-
 
