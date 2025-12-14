@@ -17,15 +17,19 @@ export const KeywordSuggester: React.FC<KeywordSuggesterProps> = ({ appName, geo
     const [allCopied, setAllCopied] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const requestIdRef = useRef(0);
+    const suggestionsCacheRef = useRef<Record<string, { suggestions: string[]; updatedAt: number }>>({});
+
+    const cacheKey = `${appName}__${geo}`;
 
     useEffect(() => {
         requestIdRef.current += 1;
-        setSuggestions([]);
+        const cached = suggestionsCacheRef.current[cacheKey];
+        setSuggestions(Array.isArray(cached?.suggestions) ? cached!.suggestions : []);
         setError(null);
         setCopiedKeyword(null);
         setAllCopied(false);
         setIsLoading(false);
-    }, [appName, geo]);
+    }, [cacheKey]);
 
     const handleGenerate = async () => {
         const reqId = requestIdRef.current + 1;
@@ -40,6 +44,7 @@ export const KeywordSuggester: React.FC<KeywordSuggesterProps> = ({ appName, geo
                 setError(t.keywordSuggesterError || 'Failed to generate keywords. Please try again later.');
             } else {
                 setSuggestions(results);
+                suggestionsCacheRef.current[cacheKey] = { suggestions: results, updatedAt: Date.now() };
             }
         } catch {
             if (requestIdRef.current !== reqId) return;

@@ -2036,47 +2036,52 @@ const App = () => {
                         )}
                     </div>
 
-                    {/* Last Synced Badge */}
+                    {/* Last Synced */}
                     {isSyncConfigured && lastSyncedAt && (
-                        <div className="text-center animate-in fade-in duration-500">
-                            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-500 bg-slate-800/30 px-1 py-0.5 rounded-full border border-slate-800">
-                                Last synced: {new Date(lastSyncedAt).toLocaleDateString('en-GB')} {new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
+                        <div className="mt-1 flex items-center justify-center">
+                            {(() => {
+                                const d = new Date(lastSyncedAt);
+                                const label = lang === 'ru' ? 'Синхронизировано' : 'Synced';
+                                const value = Number.isFinite(d.getTime())
+                                    ? `${d.toLocaleDateString('en-GB')} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                    : lastSyncedAt;
+                                return (
+                                    <span className="text-[10px] font-medium text-slate-500/90 dark:text-slate-500/90 leading-tight tabular-nums">
+                                        {label} {value}
+                                    </span>
+                                );
+                            })()}
                         </div>
                     )}
 
-                    {/* Language & Theme Controls */}
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/50">
-                        {/* Language Switch */}
-                        <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
+                </div>
+
+                {/* Footer Area */}
+                <div className="px-4 py-3 bg-slate-950 text-xs text-slate-600 shrink-0 border-t border-slate-900 flex items-center justify-between">
+                    <div className="flex flex-1 items-center gap-2 min-w-0 pr-2">
+                        <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800">
                             <button
                                 onClick={() => setLang('en')}
-                                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${lang === 'en' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${lang === 'en' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
                             >
                                 EN
                             </button>
                             <button
                                 onClick={() => setLang('ru')}
-                                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${lang === 'ru' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${lang === 'ru' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
                             >
                                 RU
                             </button>
                         </div>
 
-                        {/* Theme Switch */}
                         <button
                             onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
-                            className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                            className="p-2 bg-slate-900 border border-slate-800 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0 ml-auto"
                             title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
                         >
                             {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
                         </button>
                     </div>
-                </div>
-
-                {/* Footer Area */}
-                <div className="px-4 py-3 bg-slate-950 text-xs text-slate-600 shrink-0 border-t border-slate-900 flex items-center justify-between">
-                    <span>{t.footer}</span>
                     <button
                         onClick={handleLogout}
                         className="p-1 hover:bg-slate-800 text-slate-600 hover:text-red-400 rounded transition-colors"

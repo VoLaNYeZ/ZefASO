@@ -153,7 +153,7 @@ export const translations = {
         addSingleEntry: 'Add Single Entry',
 
         // Footer
-        footer: 'ReadyWhenItsReady Alpha v1.7',
+        footer: '',
 
         // Missing Keys
         allIds: 'All IDs',
@@ -363,7 +363,7 @@ export const translations = {
         addSingleEntry: 'Добавить запись',
 
         // Footer
-        footer: 'ReadyWhenItsReady Alpha v1.7',
+        footer: '',
 
         // Missing Keys
         allIds: 'Все ID',
