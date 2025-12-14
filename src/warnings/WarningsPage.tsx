@@ -162,51 +162,69 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
     });
   }, [folderOrder, appsByFolder, computed.byFolder]);
 
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const saveOpIdRef = useRef(0);
+  const saveTimeoutByFolderRef = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
+  const saveHardTimeoutByFolderRef = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
+  const saveOpIdByFolderRef = useRef<Record<string, number>>({});
   const saveErrorHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const saveHardTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     return () => {
       mountedRef.current = false;
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       if (saveErrorHideTimeoutRef.current) clearTimeout(saveErrorHideTimeoutRef.current);
-      if (saveHardTimeoutRef.current) clearTimeout(saveHardTimeoutRef.current);
+      Object.values(saveTimeoutByFolderRef.current).forEach((t) => t && clearTimeout(t));
+      Object.values(saveHardTimeoutByFolderRef.current).forEach((t) => t && clearTimeout(t));
     };
   }, []);
 
-  const scheduleSave = (next: WarningsSettings, folderKey?: string) => {
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    if (saveHardTimeoutRef.current) clearTimeout(saveHardTimeoutRef.current);
-    const opId = ++saveOpIdRef.current;
+  const clearFolderSaving = (folder: string) => {
+    setSavingFolders((prev) => {
+      if (!prev?.[folder]) return prev;
+      const next = { ...prev };
+      delete next[folder];
+      return next;
+    });
+  };
 
-    saveHardTimeoutRef.current = setTimeout(() => {
+  const scheduleSave = (next: WarningsSettings, folderKey: string) => {
+    if (!folderKey) return;
+
+    const prevTimeout = saveTimeoutByFolderRef.current[folderKey];
+    if (prevTimeout) clearTimeout(prevTimeout);
+
+    const prevHardTimeout = saveHardTimeoutByFolderRef.current[folderKey];
+    if (prevHardTimeout) clearTimeout(prevHardTimeout);
+
+    const opId = (saveOpIdByFolderRef.current[folderKey] || 0) + 1;
+    saveOpIdByFolderRef.current[folderKey] = opId;
+
+    saveHardTimeoutByFolderRef.current[folderKey] = setTimeout(() => {
       if (!mountedRef.current) return;
-      if (saveOpIdRef.current !== opId) return;
-      setSavingFolders({});
+      if ((saveOpIdByFolderRef.current[folderKey] || 0) !== opId) return;
+      clearFolderSaving(folderKey);
       const msg = lang === 'ru' ? 'Сохранение занимает слишком долго' : 'Saving is taking too long';
       setSaveError(msg);
       if (saveErrorHideTimeoutRef.current) clearTimeout(saveErrorHideTimeoutRef.current);
       saveErrorHideTimeoutRef.current = setTimeout(() => setSaveError(null), 6000);
     }, 12000);
 
-    saveTimeoutRef.current = setTimeout(() => {
+    saveTimeoutByFolderRef.current[folderKey] = setTimeout(() => {
       saveWarningsSettings(next)
         .then(() => {
           if (!mountedRef.current) return;
-          if (saveHardTimeoutRef.current) clearTimeout(saveHardTimeoutRef.current);
-          if (saveOpIdRef.current === opId) setSaveError(null);
-          if (saveOpIdRef.current === opId) setSavingFolders({});
-          else if (folderKey) setSavingFolders((prev) => ({ ...prev, [folderKey]: false }));
+          if ((saveOpIdByFolderRef.current[folderKey] || 0) !== opId) return;
+          const hard = saveHardTimeoutByFolderRef.current[folderKey];
+          if (hard) clearTimeout(hard);
+          clearFolderSaving(folderKey);
+          setSaveError(null);
         })
         .catch((err) => {
           console.warn('Failed to save warnings settings:', err);
           if (!mountedRef.current) return;
-          if (saveHardTimeoutRef.current) clearTimeout(saveHardTimeoutRef.current);
-          if (saveOpIdRef.current !== opId) return;
+          if ((saveOpIdByFolderRef.current[folderKey] || 0) !== opId) return;
+          const hard = saveHardTimeoutByFolderRef.current[folderKey];
+          if (hard) clearTimeout(hard);
+          clearFolderSaving(folderKey);
           const msg = lang === 'ru' ? 'Не удалось сохранить настройки' : 'Failed to save settings';
           setSaveError(msg);
-          setSavingFolders({});
           if (saveErrorHideTimeoutRef.current) clearTimeout(saveErrorHideTimeoutRef.current);
           saveErrorHideTimeoutRef.current = setTimeout(() => setSaveError(null), 6000);
         });
@@ -215,18 +233,17 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
 
   const toggleFolderMonitor = (folder: string, enabled: boolean) => {
     setSavingFolders((prev) => ({ ...prev, [folder]: true }));
-    setWarningsSettings((prev) => {
-      const next: WarningsSettings = {
-        ...prev,
-        initialized: true,
-        folders: {
-          ...(prev.folders || {}),
-          [folder]: { monitorEnabled: enabled },
-        },
-      };
-      scheduleSave(next, folder);
-      return next;
-    });
+    const next: WarningsSettings = {
+      ...warningsSettings,
+      initialized: true,
+      folders: {
+        ...(warningsSettings.folders || {}),
+        [folder]: { monitorEnabled: enabled },
+      },
+    };
+    setWarningsSettings(next);
+    scheduleSave(next, folder);
+    if (!enabled) setExpandedFolders((prev) => ({ ...prev, [folder]: false }));
   };
 
   const onClickWarning = (warning: WarningItem) => {
