@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Sparkles, Copy, Check, Loader2 } from 'lucide-react';
 import { generateKeywordSuggestions } from '../services/openaiService';
 
@@ -16,18 +16,38 @@ export const KeywordSuggester: React.FC<KeywordSuggesterProps> = ({ appName, geo
     const [copiedKeyword, setCopiedKeyword] = useState<string | null>(null);
     const [allCopied, setAllCopied] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const requestIdRef = useRef(0);
+
+    useEffect(() => {
+        requestIdRef.current += 1;
+        setSuggestions([]);
+        setError(null);
+        setCopiedKeyword(null);
+        setAllCopied(false);
+        setIsLoading(false);
+    }, [appName, geo]);
 
     const handleGenerate = async () => {
+        const reqId = requestIdRef.current + 1;
+        requestIdRef.current = reqId;
         setIsLoading(true);
         setSuggestions([]);
         setError(null);
-        const results = await generateKeywordSuggestions(appName, geo, existingKeywords);
-        if (results.length === 0) {
+        try {
+            const results = await generateKeywordSuggestions(appName, geo, existingKeywords);
+            if (requestIdRef.current !== reqId) return;
+            if (results.length === 0) {
+                setError(t.keywordSuggesterError || 'Failed to generate keywords. Please try again later.');
+            } else {
+                setSuggestions(results);
+            }
+        } catch {
+            if (requestIdRef.current !== reqId) return;
             setError(t.keywordSuggesterError || 'Failed to generate keywords. Please try again later.');
-        } else {
-            setSuggestions(results);
+        } finally {
+            if (requestIdRef.current !== reqId) return;
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
     const handleCopy = (keyword: string) => {
