@@ -450,14 +450,20 @@ export function computeWarnings(input: ComputeInput): ComputeOutput {
       const endDate = getLatestDate(series);
       if (endDate && noDataDays > 0) {
         const windowEntries = getEntriesInWindow(series.byDate, endDate, noDataDays);
-        if (windowEntries.length >= 3) {
+        if (windowEntries.length === noDataDays) {
           const installsSum = sumInstalls(windowEntries);
+          let installsDays = 0;
+          for (const entry of windowEntries) {
+            const value = entry?.installs;
+            if (isFiniteNumber(value) && value > 0) installsDays++;
+          }
           const validRanks = ranksFromEntries(windowEntries);
-          if (installsSum > 0 && validRanks.length === 0) {
+          const hasInstallsEveryDay = installsDays === noDataDays;
+          if (hasInstallsEveryDay && installsSum > 0 && validRanks.length === 0) {
             const suffix =
               lang === 'ru'
-                ? `нет данных по позиции ${noDataDays} дней при наличии установок`
-                : `no ranking data for ${noDataDays} days while installs exist`;
+                ? `нет данных по позиции ${noDataDays} дней при наличии установок каждый день`
+                : `no ranking data for ${noDataDays} days while installs exist every day`;
             pushWarning({
               id: `no_rank_data_during_push|${appKey}|${geo}|${keyword}`,
               ruleId: 'no_rank_data_during_push',
@@ -466,7 +472,7 @@ export function computeWarnings(input: ComputeInput): ComputeOutput {
               geo,
               keyword,
               message: buildMessage(lang, geo, keyword, suffix),
-              evidence: { endDate, noDataDays, entriesCount: windowEntries.length, installsSum },
+              evidence: { endDate, noDataDays, entriesCount: windowEntries.length, installsSum, installsDays },
               createdFromDate: endDate,
             });
           }
