@@ -67,7 +67,8 @@ import { supabase } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
 import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, loadAppAliases, saveAppAliasesForApp, deleteAsoEntriesForAppGroup, loadWarningsSettings } from './lib/supabaseService';
-import { fetchSheetData, processSheetData } from './services/googleSheets';
+import { fetchSheetData, fetchSheetTabs, processSheetData } from './services/googleSheets';
+import { ALL_TABS_SENTINEL, buildStoredTabsAllExcept, resolveTabsToSync } from './utils/googleSheetsSync';
 import { BalancePanel } from './components/BalancePanel';
 import { AppAliasManager } from './components/AppAliasManager';
 import { WarningsPage } from './src/warnings/WarningsPage';
@@ -241,6 +242,7 @@ const App = () => {
     const hasLoadedData = useRef(false);
     const currentUserId = useRef<string | null>(null);
     const hasUserAddedData = useRef(false);
+    const hasRunAutoSync = useRef(false);
 
     // Load initial data from Supabase when authenticated
     useEffect(() => {
@@ -1114,10 +1116,18 @@ const App = () => {
 
     // -- Automatic Google Sheets Sync --
     useEffect(() => {
-        if (!session || !currentUserId.current) return;
+        if (!session) {
+            hasRunAutoSync.current = false;
+            return;
+        }
+        if (dataLoading || loadFailed) return;
+        if (hasRunAutoSync.current) return;
+        hasRunAutoSync.current = true;
 
         const runSync = async () => {
             try {
+                const AUTO_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
                 const { data: syncSettings, error } = await supabase
                     .from('google_sheets_sync')
                     .select('*')
@@ -1126,24 +1136,48 @@ const App = () => {
 
                 if (error || !syncSettings || !syncSettings.is_sync_enabled) return;
 
-                const lastSynced = syncSettings.last_synced_at ? new Date(syncSettings.last_synced_at) : null;
-                if (syncSettings.last_synced_at) setLastSyncedAt(syncSettings.last_synced_at); // Update state
+                const lastSyncedAt = syncSettings.last_synced_at as string | undefined;
+                if (lastSyncedAt) setLastSyncedAt(lastSyncedAt);
 
-                const today = new Date();
-                const isSameDay = lastSynced &&
-                    lastSynced.getDate() === today.getDate() &&
-                    lastSynced.getMonth() === today.getMonth() &&
-                    lastSynced.getFullYear() === today.getFullYear();
+                const shouldSync = (() => {
+                    if (!lastSyncedAt) return true;
+                    const lastMs = Date.parse(lastSyncedAt);
+                    if (!Number.isFinite(lastMs)) return true;
+                    return Date.now() - lastMs >= AUTO_SYNC_INTERVAL_MS;
+                })();
 
-                if (isSameDay) return; // Already synced today
+                if (!shouldSync) return;
 
                 console.log("Running automatic Google Sheets sync...");
-                const tabs = syncSettings.selected_tabs as string[];
-                if (!tabs || tabs.length === 0) return;
+
+                let tabsToSync: string[] = [];
+                let shouldMigrateTabSelection = false;
+
+                try {
+                    const allTabs = await fetchSheetTabs(syncSettings.web_app_url);
+                    const resolved = resolveTabsToSync(allTabs, syncSettings.selected_tabs);
+                    if (resolved.mode === 'all_except') {
+                        tabsToSync = resolved.tabsToSync;
+                    } else {
+                        tabsToSync = allTabs;
+                        shouldMigrateTabSelection = true; // Move existing configs to "all tabs except excluded" mode
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch tabs list for auto-sync; falling back to saved selection.", e);
+                    const stored = Array.isArray(syncSettings.selected_tabs)
+                        ? (syncSettings.selected_tabs as unknown[]).filter((t): t is string => typeof t === 'string')
+                        : [];
+
+                    if (!stored.includes(ALL_TABS_SENTINEL)) {
+                        tabsToSync = stored;
+                    } else {
+                        return;
+                    }
+                }
 
                 let newEntries: AsoEntry[] = [];
 
-                for (const tab of tabs) {
+                for (const tab of tabsToSync) {
                     try {
                         const sheetData = await fetchSheetData(syncSettings.web_app_url, tab);
                         const entries = processSheetData(sheetData, tab);
@@ -1155,18 +1189,21 @@ const App = () => {
 
                 if (newEntries.length > 0) {
                     await handleAddData(newEntries); // Merge into state and persist
-
-                    // Update last_synced_at
-                    const now = new Date().toISOString();
-                    await supabase
-                        .from('google_sheets_sync')
-                        .update({ last_synced_at: now })
-                        .eq('user_id', session.user.id);
-
-                    setLastSyncedAt(now);
-
-                    console.log(`Synced ${newEntries.length} entries from Google Sheets.`);
                 }
+
+                // Update last_synced_at even if no new entries (to reflect the check)
+                const now = new Date().toISOString();
+                await supabase
+                    .from('google_sheets_sync')
+                    .update({
+                        last_synced_at: now,
+                        ...(shouldMigrateTabSelection ? { selected_tabs: buildStoredTabsAllExcept([]) } : {})
+                    })
+                    .eq('user_id', session.user.id);
+
+                setLastSyncedAt(now);
+
+                console.log(`Auto-sync done. Imported ${newEntries.length} entries from Google Sheets.`);
 
             } catch (err) {
                 console.error("Auto-sync failed:", err);
@@ -1176,7 +1213,7 @@ const App = () => {
         // Run sync shortly after load to avoid blocking initial render
         const timer = setTimeout(runSync, 3000);
         return () => clearTimeout(timer);
-    }, [session]);
+    }, [session, dataLoading, loadFailed]);
 
     const handleManualRefresh = async () => {
         if (!session || isSyncing) return;
@@ -1195,13 +1232,36 @@ const App = () => {
             }
 
             console.log("Running manual Google Sheets sync...");
-            const tabs = syncSettings.selected_tabs as string[];
-            if (!tabs || tabs.length === 0) return;
+
+            let tabsToSync: string[] = [];
+            let shouldMigrateTabSelection = false;
+
+            try {
+                const allTabs = await fetchSheetTabs(syncSettings.web_app_url);
+                const resolved = resolveTabsToSync(allTabs, syncSettings.selected_tabs);
+                if (resolved.mode === 'all_except') {
+                    tabsToSync = resolved.tabsToSync;
+                } else {
+                    tabsToSync = allTabs;
+                    shouldMigrateTabSelection = true;
+                }
+            } catch (e) {
+                console.error("Failed to fetch tabs list for manual sync; falling back to saved selection.", e);
+                const stored = Array.isArray(syncSettings.selected_tabs)
+                    ? (syncSettings.selected_tabs as unknown[]).filter((t): t is string => typeof t === 'string')
+                    : [];
+
+                if (!stored.includes(ALL_TABS_SENTINEL)) {
+                    tabsToSync = stored;
+                } else {
+                    return;
+                }
+            }
 
             let newEntries: AsoEntry[] = [];
             let errorCount = 0;
 
-            for (const tab of tabs) {
+            for (const tab of tabsToSync) {
                 try {
                     const sheetData = await fetchSheetData(syncSettings.web_app_url, tab);
                     const entries = processSheetData(sheetData, tab);
@@ -1219,7 +1279,10 @@ const App = () => {
                 const now = new Date().toISOString();
                 await supabase
                     .from('google_sheets_sync')
-                    .update({ last_synced_at: now })
+                    .update({
+                        last_synced_at: now,
+                        ...(shouldMigrateTabSelection ? { selected_tabs: buildStoredTabsAllExcept([]) } : {})
+                    })
                     .eq('user_id', session.user.id);
 
                 setLastSyncedAt(now);
@@ -1232,7 +1295,10 @@ const App = () => {
                 const now = new Date().toISOString();
                 await supabase
                     .from('google_sheets_sync')
-                    .update({ last_synced_at: now })
+                    .update({
+                        last_synced_at: now,
+                        ...(shouldMigrateTabSelection ? { selected_tabs: buildStoredTabsAllExcept([]) } : {})
+                    })
                     .eq('user_id', session.user.id);
 
                 setLastSyncedAt(now);

@@ -4,6 +4,7 @@ import { fetchSheetTabs, fetchSheetData, processSheetData } from '../services/go
 import { supabase } from '../lib/supabase';
 import { AsoEntry, Translations } from '../types';
 import { DEFAULT_CPI } from '../constants';
+import { ALL_TABS_SENTINEL, buildStoredTabsAllExcept, resolveTabsToSync } from '../utils/googleSheetsSync';
 
 interface DataUploadModalProps {
     isOpen: boolean;
@@ -81,11 +82,23 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
 
         if (data) {
             setWebAppUrl(data.web_app_url);
-            // We don't have all tabs stored, only selected ones. 
-            // To allow editing, we might need to fetch all tabs again if the user wants to change them.
-            // For now, let's just show the selected ones and allow disconnect.
-            setSheetTabs(data.selected_tabs || []);
-            setSelectedTabs(new Set(data.selected_tabs || []));
+            setIsFetchingTabs(true);
+            try {
+                const tabs = await fetchSheetTabs(data.web_app_url);
+                setSheetTabs(tabs);
+                const resolved = resolveTabsToSync(tabs, data.selected_tabs);
+                const effectiveSelected = resolved.mode === 'all_except' ? resolved.tabsToSync : tabs;
+                setSelectedTabs(new Set(effectiveSelected));
+            } catch (e) {
+                console.warn("Failed to fetch tabs for saved sync config:", e);
+                const stored = Array.isArray(data.selected_tabs)
+                    ? (data.selected_tabs as unknown[]).filter((t): t is string => typeof t === 'string' && t !== ALL_TABS_SENTINEL)
+                    : [];
+                setSheetTabs(stored);
+                setSelectedTabs(new Set(stored));
+            } finally {
+                setIsFetchingTabs(false);
+            }
             setIsSyncEnabled(data.is_sync_enabled);
             setLastSyncedAt(data.last_synced_at || null);
             setHasSavedSync(true);
@@ -541,23 +554,24 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                     dates: Array.from(foundDates).sort()
                 });
 
-                // Save Sync Settings
-                if (isSyncEnabled) {
-                    const { data: { user } } = await supabase.auth.getUser();
-                    if (user) {
-                        const now = new Date().toISOString();
-                        const { error } = await supabase
-                            .from('google_sheets_sync')
-                            .upsert({
-                                user_id: user.id,
-                                web_app_url: webAppUrl,
-                                is_sync_enabled: true,
-                                selected_tabs: Array.from(selectedTabs),
-                                last_synced_at: now
-                            });
-                        if (error) {
-                            console.error("Failed to save sync settings:", error);
-                            alert("Data imported, but failed to save sync settings: " + error.message);
+            // Save Sync Settings
+            if (isSyncEnabled) {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const now = new Date().toISOString();
+                    const excludedTabs = sheetTabs.filter(tab => !selectedTabs.has(tab));
+                    const { error } = await supabase
+                        .from('google_sheets_sync')
+                        .upsert({
+                            user_id: user.id,
+                            web_app_url: webAppUrl,
+                            is_sync_enabled: true,
+                            selected_tabs: buildStoredTabsAllExcept(excludedTabs),
+                            last_synced_at: now
+                        });
+                    if (error) {
+                        console.error("Failed to save sync settings:", error);
+                        alert("Data imported, but failed to save sync settings: " + error.message);
                         } else {
                             console.log("Sync settings saved successfully.");
                             setLastSyncedAt(now); // Update local state
@@ -747,12 +761,14 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                                                 try {
                                                                     const tabs = await fetchSheetTabs(webAppUrl);
                                                                     setSheetTabs(tabs);
-                                                                    // Keep existing selection, but filter out tabs that no longer exist
-                                                                    const newSet = new Set<string>();
-                                                                    selectedTabs.forEach(t => {
-                                                                        if (tabs.includes(t)) newSet.add(t);
+                                                                    // Keep exclusions, but include any newly created tabs by default
+                                                                    const excluded = sheetTabs.filter(t => !selectedTabs.has(t));
+                                                                    const excludedSet = new Set(excluded);
+                                                                    const nextSelected = new Set<string>();
+                                                                    tabs.forEach(t => {
+                                                                        if (!excludedSet.has(t)) nextSelected.add(t);
                                                                     });
-                                                                    setSelectedTabs(newSet);
+                                                                    setSelectedTabs(nextSelected);
                                                                     alert(`Tabs refreshed! Found ${tabs.length} tabs.`);
                                                                 } catch (error: any) {
                                                                     alert(`Failed to refresh tabs: ${error.message}`);
@@ -862,7 +878,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                                             className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                                         />
                                                         <label htmlFor="autoSync" className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                                                            Automatic daily sync (on session start)
+                                                            Automatic sync (every 6h on session start)
                                                         </label>
                                                     </div>
 

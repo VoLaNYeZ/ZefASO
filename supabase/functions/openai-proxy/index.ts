@@ -13,6 +13,7 @@ const ALLOWED_ORIGINS = [
 const corsHeaders = (origin: string | null) => ({
     'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin || '') ? origin! : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
 });
 
 interface OpenAIRequest {
@@ -26,6 +27,65 @@ interface OpenAIRequest {
     // For keywords
     existingKeywords?: string[];
 }
+
+const extractResponseText = (data: any): string => {
+    if (typeof data?.output_text === 'string') return data.output_text;
+
+    const output = data?.output;
+    if (Array.isArray(output)) {
+        const parts: string[] = [];
+        for (const item of output) {
+            const content = item?.content;
+            if (!Array.isArray(content)) continue;
+
+            for (const part of content) {
+                if (typeof part?.text === 'string') parts.push(part.text);
+            }
+        }
+        if (parts.length > 0) return parts.join('');
+    }
+
+    if (typeof data?.choices?.[0]?.message?.content === 'string') {
+        return data.choices[0].message.content;
+    }
+
+    return '';
+};
+
+const normalizeKeywordsJson = (raw: string): string | null => {
+    const trimmed = raw.trim();
+
+    const unfenced = (() => {
+        const match = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+        return match?.[1]?.trim() ?? trimmed;
+    })();
+
+    const tryParse = (text: string) => {
+        try {
+            return JSON.parse(text);
+        } catch {
+            return null;
+        }
+    };
+
+    const parsed =
+        tryParse(unfenced) ??
+        (() => {
+            const first = unfenced.indexOf('{');
+            const last = unfenced.lastIndexOf('}');
+            if (first === -1 || last === -1 || last <= first) return null;
+            return tryParse(unfenced.slice(first, last + 1));
+        })();
+
+    const keywords = parsed?.keywords;
+    if (!Array.isArray(keywords)) return null;
+
+    const cleaned = keywords
+        .map((k: unknown) => String(k ?? '').trim())
+        .filter(Boolean);
+
+    return JSON.stringify({ keywords: cleaned });
+};
 
 serve(async (req) => {
     const origin = req.headers.get('origin');
@@ -49,7 +109,6 @@ serve(async (req) => {
         let messages: { role: string; content: string }[] = [];
         let model = 'gpt-5-mini';
         let maxTokens = 900;
-        let responseFormat: { type: string } | undefined;
 
         if (body.type === 'analysis') {
             const languageInstruction = body.language === 'ru'
@@ -98,7 +157,6 @@ Output requirements:
         } else if (body.type === 'keywords') {
             model = 'gpt-5-mini';
             maxTokens = 1000;
-            responseFormat = { type: 'json_object' };
 
             messages = [
                 {
@@ -151,7 +209,12 @@ Suggest keywords in English.
 
         console.log(`[OpenAI Proxy] Processing ${body.type} request for app: ${body.appName}`);
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const systemMessage = messages.find((m) => m.role === 'system')?.content;
+        const inputMessages = messages
+            .filter((m) => m.role !== 'system')
+            .map((m) => ({ role: m.role, content: m.content }));
+
+        const response = await fetch('https://api.openai.com/v1/responses', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -159,10 +222,10 @@ Suggest keywords in English.
             },
             body: JSON.stringify({
                 model,
-                messages,
-                temperature: 0.7,
-                max_tokens: maxTokens,
-                ...(responseFormat && { response_format: responseFormat }),
+                ...(systemMessage ? { instructions: systemMessage } : {}),
+                input: inputMessages,
+                temperature: body.type === 'keywords' ? 0.2 : 0.7,
+                max_output_tokens: maxTokens,
             }),
         });
 
@@ -176,7 +239,18 @@ Suggest keywords in English.
         }
 
         const data = await response.json();
-        const content = data.choices[0]?.message?.content || '';
+        let content = extractResponseText(data);
+
+        if (body.type === 'keywords') {
+            const normalized = normalizeKeywordsJson(content);
+            if (!normalized) {
+                return new Response(
+                    JSON.stringify({ error: 'Model returned invalid JSON for keywords' }),
+                    { status: 502, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' } }
+                );
+            }
+            content = normalized;
+        }
 
         console.log(`[OpenAI Proxy] Success for ${body.type}`);
 
