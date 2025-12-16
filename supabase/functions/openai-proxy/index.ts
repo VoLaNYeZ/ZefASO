@@ -47,7 +47,7 @@ serve(async (req) => {
         const body: OpenAIRequest = await req.json();
 
         let messages: { role: string; content: string }[] = [];
-        let model = 'gpt-5-nano-2025-08-07';
+        let model = 'gpt-5-mini';
         let maxTokens = 900;
         let responseFormat: { type: string } | undefined;
 
@@ -96,7 +96,7 @@ Output requirements:
                  }
             ];
         } else if (body.type === 'keywords') {
-            model = 'gpt-4o-mini';
+            model = 'gpt-5-mini';
             maxTokens = 1000;
             responseFormat = { type: 'json_object' };
 
