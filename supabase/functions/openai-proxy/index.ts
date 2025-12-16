@@ -28,26 +28,62 @@ interface OpenAIRequest {
     existingKeywords?: string[];
 }
 
+const extractTextFromUnknownContent = (content: unknown): string => {
+    if (typeof content === 'string') return content;
+
+    if (Array.isArray(content)) {
+        const parts: string[] = [];
+        for (const part of content) {
+            const text = (part as any)?.text;
+            const refusal = (part as any)?.refusal;
+            if (typeof text === 'string') parts.push(text);
+            else if (typeof text?.value === 'string') parts.push(text.value);
+            else if (typeof refusal === 'string') parts.push(refusal);
+            else if (typeof refusal?.value === 'string') parts.push(refusal.value);
+        }
+        return parts.join('');
+    }
+
+    const text = (content as any)?.text;
+    const refusal = (content as any)?.refusal;
+    if (typeof text === 'string') return text;
+    if (typeof text?.value === 'string') return text.value;
+    if (typeof refusal === 'string') return refusal;
+    if (typeof refusal?.value === 'string') return refusal.value;
+
+    return '';
+};
+
 const extractResponseText = (data: any): string => {
+    // Responses API (new)
     if (typeof data?.output_text === 'string') return data.output_text;
 
     const output = data?.output;
     if (Array.isArray(output)) {
         const parts: string[] = [];
         for (const item of output) {
-            const content = item?.content;
-            if (!Array.isArray(content)) continue;
-
-            for (const part of content) {
-                if (typeof part?.text === 'string') parts.push(part.text);
+            const directText = extractTextFromUnknownContent(item?.text);
+            if (directText) {
+                parts.push(directText);
+                continue;
             }
+
+            const extracted = extractTextFromUnknownContent(item?.content);
+            if (extracted) parts.push(extracted);
         }
         if (parts.length > 0) return parts.join('');
     }
 
-    if (typeof data?.choices?.[0]?.message?.content === 'string') {
-        return data.choices[0].message.content;
-    }
+    // Chat Completions API (legacy)
+    const choice = data?.choices?.[0];
+    const message = choice?.message;
+    const messageContent = extractTextFromUnknownContent(message?.content);
+    if (messageContent) return messageContent;
+
+    if (typeof message?.refusal === 'string') return message.refusal;
+
+    const toolArgs = message?.tool_calls?.[0]?.function?.arguments;
+    if (typeof toolArgs === 'string') return toolArgs;
 
     return '';
 };
@@ -108,7 +144,9 @@ serve(async (req) => {
 
         let messages: { role: string; content: string }[] = [];
         let model = 'gpt-5-mini';
-        let maxTokens = 900;
+        // NOTE: GPT-5 models can spend a lot of completion tokens on internal reasoning.
+        // If max is too low, you can get finish_reason="length" with empty `message.content`.
+        let maxTokens = 2000;
 
         if (body.type === 'analysis') {
             const languageInstruction = body.language === 'ru'
@@ -118,7 +156,7 @@ serve(async (req) => {
             messages = [
                 {
                     role: 'system',
-                    content: 'You are an expert ASO (App Store Optimization) Manager. Be concise, practical, and avoid incorrect causal claims.'
+                    content: 'You are an expert ASO (App Store Optimization) Manager. Be concise, practical, and avoid incorrect causal claims. Respond with the final answer only.'
                 },
                 {
                     role: 'user',
@@ -155,13 +193,13 @@ Output requirements:
                  }
             ];
         } else if (body.type === 'keywords') {
-            model = 'gpt-5-mini';
-            maxTokens = 1000;
+            model = 'gpt-5-nano';
+            maxTokens = 600;
 
             messages = [
                 {
                     role: 'system',
-                    content: 'You are an expert ASO Manager. Output ONLY valid JSON.'
+                    content: 'You are an expert ASO Manager. Output ONLY valid JSON and nothing else (no code fences, no extra text). Respond with the final answer only.'
                 },
                 {
                     role: 'user',
@@ -209,37 +247,109 @@ Suggest keywords in English.
 
         console.log(`[OpenAI Proxy] Processing ${body.type} request for app: ${body.appName}`);
 
-        const systemMessage = messages.find((m) => m.role === 'system')?.content;
-        const inputMessages = messages
-            .filter((m) => m.role !== 'system')
-            .map((m) => ({ role: m.role, content: m.content }));
+        const callOpenAI = async (maxCompletionTokens: number) => {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                    model,
+                    messages,
+                    max_completion_tokens: maxCompletionTokens,
+                }),
+            });
 
-        const response = await fetch('https://api.openai.com/v1/responses', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-                model,
-                ...(systemMessage ? { instructions: systemMessage } : {}),
-                input: inputMessages,
-                temperature: body.type === 'keywords' ? 0.2 : 0.7,
-                max_output_tokens: maxTokens,
-            }),
-        });
+            const raw = await response.text();
+            return { response, raw };
+        };
+
+        let maxCompletionTokens = maxTokens;
+        let { response, raw } = await callOpenAI(maxCompletionTokens);
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            console.error('[OpenAI Proxy] API Error:', errorData);
+            let errorMessage = 'OpenAI API error';
+            try {
+                const parsed = JSON.parse(raw);
+                errorMessage = parsed?.error?.message || errorMessage;
+            } catch {
+                if (raw.trim()) errorMessage = raw.slice(0, 300);
+            }
+
+            console.error('[OpenAI Proxy] API Error:', errorMessage);
             return new Response(
-                JSON.stringify({ error: errorData.error?.message || 'OpenAI API error' }),
+                JSON.stringify({ error: errorMessage }),
                 { status: response.status, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' } }
             );
         }
 
-        const data = await response.json();
-        let content = extractResponseText(data);
+        const parseUpstreamJson = (text: string) => {
+            try {
+                return JSON.parse(text);
+            } catch {
+                return null;
+            }
+        };
+
+        let data: any = parseUpstreamJson(raw);
+        if (!data) {
+            console.error('[OpenAI Proxy] Failed to parse upstream JSON');
+            return new Response(
+                JSON.stringify({ error: 'Invalid JSON from OpenAI' }),
+                { status: 502, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' } }
+            );
+        }
+
+        let content = extractResponseText(data).trim();
+        const finishReason = data?.choices?.[0]?.finish_reason;
+
+        // Retry once if the model hit the token limit and produced no final text.
+        if (body.type === 'analysis' && !content && finishReason === 'length') {
+            const retryMax = Math.min(Math.max(maxCompletionTokens * 2, 4000), 8000);
+            if (retryMax > maxCompletionTokens) {
+                maxCompletionTokens = retryMax;
+                ({ response, raw } = await callOpenAI(maxCompletionTokens));
+
+                if (!response.ok) {
+                    let errorMessage = 'OpenAI API error';
+                    try {
+                        const parsed = JSON.parse(raw);
+                        errorMessage = parsed?.error?.message || errorMessage;
+                    } catch {
+                        if (raw.trim()) errorMessage = raw.slice(0, 300);
+                    }
+
+                    console.error('[OpenAI Proxy] API Retry Error:', errorMessage);
+                    return new Response(
+                        JSON.stringify({ error: errorMessage }),
+                        { status: response.status, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' } }
+                    );
+                }
+
+                data = parseUpstreamJson(raw);
+                if (!data) {
+                    console.error('[OpenAI Proxy] Failed to parse upstream JSON (retry)');
+                    return new Response(
+                        JSON.stringify({ error: 'Invalid JSON from OpenAI' }),
+                        { status: 502, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' } }
+                    );
+                }
+
+                content = extractResponseText(data).trim();
+            }
+        }
+
+        if (!content) {
+            console.error('[OpenAI Proxy] Empty content from upstream. Keys:', Object.keys(data || {}));
+            // Don’t silently return empty content; it hides upstream shape mismatches.
+            return new Response(
+                JSON.stringify({
+                    error: 'Empty content from OpenAI (unexpected response shape)',
+                }),
+                { status: 502, headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' } }
+            );
+        }
 
         if (body.type === 'keywords') {
             const normalized = normalizeKeywordsJson(content);
