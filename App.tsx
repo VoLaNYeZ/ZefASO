@@ -1097,12 +1097,9 @@ const App = () => {
 
     const handleAddData = async (newEntries: AsoEntry[]) => {
         hasUserAddedData.current = true;
-        let merged: AsoEntry[] = [];
-
-        setData(prev => {
-            merged = mergeEntries(prev, newEntries);
-            return merged;
-        });
+        const merged = mergeEntries(dataRef.current, newEntries);
+        dataRef.current = merged;
+        setData(merged);
 
         // Persist immediately to Supabase in addition to the debounced saver
         if (session) {

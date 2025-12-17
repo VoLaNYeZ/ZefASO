@@ -20,18 +20,32 @@ const getUserIdOrNull = async (): Promise<string | null> => {
 
 export const loadAsoData = async (): Promise<AsoEntry[]> => {
     const userId = await getUserId();
-    const { data, error } = await supabase
-        .from('aso_entries')
-        .select('*')
-        .eq('user_id', userId);
 
-    if (error) {
-        console.error('Error loading ASO data:', error);
-        return [];
+    const pageSize = 1000;
+    const rows: any[] = [];
+
+    for (let from = 0; ; from += pageSize) {
+        const to = from + pageSize - 1;
+        const { data, error } = await supabase
+            .from('aso_entries')
+            .select('*')
+            .eq('user_id', userId)
+            .order('id', { ascending: true })
+            .range(from, to);
+
+        if (error) {
+            console.error('Error loading ASO data:', error);
+            return [];
+        }
+
+        const batch = data || [];
+        rows.push(...batch);
+
+        if (batch.length < pageSize) break;
     }
 
     // Transform database format to app format
-    return (data || []).map(row => ({
+    return rows.map(row => ({
         id: row.id.toString(),
         date: row.date,
         appName: row.app_name,
@@ -349,19 +363,31 @@ export const loadBalanceEntries = async (): Promise<BalanceEntry[]> => {
     const userId = await getUserId();
 
     try {
-        const { data, error } = await supabase
-            .from('balance_entries')
-            .select('*')
-            .eq('user_id', userId)
-            .order('entry_date', { ascending: false })
-            .order('created_at', { ascending: false });
+        const pageSize = 1000;
+        const rows: any[] = [];
 
-        if (error) {
-            console.error('Error loading balance entries:', error);
-            return [];
+        for (let from = 0; ; from += pageSize) {
+            const to = from + pageSize - 1;
+            const { data, error } = await supabase
+                .from('balance_entries')
+                .select('*')
+                .eq('user_id', userId)
+                .order('entry_date', { ascending: false })
+                .order('created_at', { ascending: false })
+                .range(from, to);
+
+            if (error) {
+                console.error('Error loading balance entries:', error);
+                return [];
+            }
+
+            const batch = data || [];
+            rows.push(...batch);
+
+            if (batch.length < pageSize) break;
         }
 
-        return (data || []).map((row: any) => ({
+        return rows.map((row: any) => ({
             id: row.id?.toString?.() ?? row.id,
             amount: Number(row.amount) || 0,
             note: row.note ?? null,

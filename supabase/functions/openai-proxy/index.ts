@@ -194,7 +194,8 @@ Output requirements:
             ];
         } else if (body.type === 'keywords') {
             model = 'gpt-5-nano';
-            maxTokens = 600;
+            // NOTE: Even nano can spend tokens on internal reasoning; keep enough budget for JSON output.
+            maxTokens = 1200;
 
             messages = [
                 {
@@ -305,8 +306,10 @@ Suggest keywords in English.
         const finishReason = data?.choices?.[0]?.finish_reason;
 
         // Retry once if the model hit the token limit and produced no final text.
-        if (body.type === 'analysis' && !content && finishReason === 'length') {
-            const retryMax = Math.min(Math.max(maxCompletionTokens * 2, 4000), 8000);
+        if (!content && finishReason === 'length') {
+            const retryFloor = body.type === 'keywords' ? 2000 : 4000;
+            const retryCap = body.type === 'keywords' ? 4000 : 8000;
+            const retryMax = Math.min(Math.max(maxCompletionTokens * 2, retryFloor), retryCap);
             if (retryMax > maxCompletionTokens) {
                 maxCompletionTokens = retryMax;
                 ({ response, raw } = await callOpenAI(maxCompletionTokens));
@@ -341,7 +344,7 @@ Suggest keywords in English.
         }
 
         if (!content) {
-            console.error('[OpenAI Proxy] Empty content from upstream. Keys:', Object.keys(data || {}));
+            console.error('[OpenAI Proxy] Empty content from upstream. Keys:', Object.keys(data || {}), 'finish_reason:', finishReason);
             // Don’t silently return empty content; it hides upstream shape mismatches.
             return new Response(
                 JSON.stringify({
