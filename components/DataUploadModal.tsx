@@ -38,6 +38,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
     const [sheetTabs, setSheetTabs] = useState<string[]>([]);
     const [selectedTabs, setSelectedTabs] = useState<Set<string>>(new Set());
     const [isSyncEnabled, setIsSyncEnabled] = useState(false);
+    const [isServerScheduled, setIsServerScheduled] = useState(false);
     const [isFetchingTabs, setIsFetchingTabs] = useState(false);
     const [isImportingSheet, setIsImportingSheet] = useState(false);
     const [hasSavedSync, setHasSavedSync] = useState(false);
@@ -100,6 +101,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                 setIsFetchingTabs(false);
             }
             setIsSyncEnabled(data.is_sync_enabled);
+            setIsServerScheduled(!!data.is_server_scheduled);
             setLastSyncedAt(data.last_synced_at || null);
             setHasSavedSync(true);
         }
@@ -122,6 +124,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
             setSheetTabs([]);
             setSelectedTabs(new Set());
             setIsSyncEnabled(false);
+            setIsServerScheduled(false);
             if (onSyncStatusChange) onSyncStatusChange(false);
         } else {
             alert("Failed to disconnect.");
@@ -151,6 +154,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
         setSheetTabs([]);
         setSelectedTabs(new Set());
         setIsSyncEnabled(false);
+        setIsServerScheduled(false);
     };
 
     const parseDate = (dateStr: string): string | null => {
@@ -505,6 +509,65 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
         }
     };
 
+    const handleSaveSheetSettings = async () => {
+        if (!isSyncEnabled) {
+            alert('Enable "Automatic sync" to save settings.');
+            return;
+        }
+        if (!webAppUrl) {
+            alert("Please enter the Web App URL");
+            return;
+        }
+        if (selectedTabs.size === 0) {
+            alert("Please select at least one tab to sync");
+            return;
+        }
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            alert("Please log in to save settings.");
+            return;
+        }
+
+        const excludedTabs = sheetTabs.filter(tab => !selectedTabs.has(tab));
+
+        const payloadBase = {
+            user_id: user.id,
+            web_app_url: webAppUrl,
+            is_sync_enabled: true,
+            selected_tabs: buildStoredTabsAllExcept(excludedTabs)
+        };
+
+        // Backwards-compatible: if the DB migration hasn't been applied yet, retry without is_server_scheduled.
+        const { error } = await (async () => {
+            const first = await supabase
+                .from('google_sheets_sync')
+                .upsert({
+                    ...payloadBase,
+                    is_server_scheduled: isServerScheduled
+                });
+
+            if (!first.error) return first;
+
+            const msg = String(first.error.message || '');
+            if (!msg.toLowerCase().includes('is_server_scheduled')) return first;
+
+            return await supabase
+                .from('google_sheets_sync')
+                .upsert(payloadBase);
+        })();
+
+        if (error) {
+            console.error("Failed to save sync settings:", error);
+            alert("Failed to save sync settings: " + error.message);
+            return;
+        }
+
+        alert("Settings saved.");
+        setHasSavedSync(true);
+        if (onSyncStatusChange) onSyncStatusChange(true);
+    };
+
     const handleSheetImport = async () => {
         if (selectedTabs.size === 0) {
             alert("Please select at least one tab to import");
@@ -554,24 +617,43 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                     dates: Array.from(foundDates).sort()
                 });
 
-            // Save Sync Settings
-            if (isSyncEnabled) {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                    const now = new Date().toISOString();
-                    const excludedTabs = sheetTabs.filter(tab => !selectedTabs.has(tab));
-                    const { error } = await supabase
-                        .from('google_sheets_sync')
-                        .upsert({
+                // Save Sync Settings
+                if (isSyncEnabled) {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user) {
+                        const now = new Date().toISOString();
+                        const excludedTabs = sheetTabs.filter(tab => !selectedTabs.has(tab));
+
+                        const payloadBase = {
                             user_id: user.id,
                             web_app_url: webAppUrl,
                             is_sync_enabled: true,
                             selected_tabs: buildStoredTabsAllExcept(excludedTabs),
                             last_synced_at: now
-                        });
-                    if (error) {
-                        console.error("Failed to save sync settings:", error);
-                        alert("Data imported, but failed to save sync settings: " + error.message);
+                        };
+
+                        // Backwards-compatible: if the DB migration hasn't been applied yet, retry without is_server_scheduled.
+                        const { error } = await (async () => {
+                            const first = await supabase
+                                .from('google_sheets_sync')
+                                .upsert({
+                                    ...payloadBase,
+                                    is_server_scheduled: isServerScheduled
+                                });
+
+                            if (!first.error) return first;
+
+                            const msg = String(first.error.message || '');
+                            if (!msg.toLowerCase().includes('is_server_scheduled')) return first;
+
+                            return await supabase
+                                .from('google_sheets_sync')
+                                .upsert(payloadBase);
+                        })();
+
+                        if (error) {
+                            console.error("Failed to save sync settings:", error);
+                            alert("Data imported, but failed to save sync settings: " + error.message);
                         } else {
                             console.log("Sync settings saved successfully.");
                             setLastSyncedAt(now); // Update local state
@@ -752,6 +834,13 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                                     </div>
                                                 </div>
 
+                                                <div className="flex items-center justify-between">
+                                                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Server schedule</label>
+                                                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                                                        {isServerScheduled ? 'Enabled (00/06/12/18 UTC+3)' : 'Disabled'}
+                                                    </span>
+                                                </div>
+
                                                 <div>
                                                     <div className="flex justify-between items-end mb-1">
                                                         <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Synced Tabs</label>
@@ -882,13 +971,39 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                                                         </label>
                                                     </div>
 
-                                                    <button
-                                                        onClick={handleSheetImport}
-                                                        disabled={isImportingSheet || selectedTabs.size === 0}
-                                                        className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                                                    >
-                                                        {isImportingSheet ? 'Importing...' : 'Import Selected Tabs'}
-                                                    </button>
+                                                    <div className="flex items-center space-x-2 mb-4 -mt-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            id="serverSchedule"
+                                                            checked={isServerScheduled}
+                                                            onChange={(e) => setIsServerScheduled(e.target.checked)}
+                                                            disabled={!isSyncEnabled}
+                                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                                                        />
+                                                        <label
+                                                            htmlFor="serverSchedule"
+                                                            className={`text-sm font-medium cursor-pointer ${isSyncEnabled ? 'text-slate-700 dark:text-slate-300' : 'text-slate-400 dark:text-slate-500'}`}
+                                                        >
+                                                            Server scheduled sync (00/06/12/18 UTC+3)
+                                                        </label>
+                                                    </div>
+
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={handleSaveSheetSettings}
+                                                            disabled={isImportingSheet || selectedTabs.size === 0 || !isSyncEnabled}
+                                                            className="flex-1 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100 py-2 rounded-lg font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
+                                                        >
+                                                            Save Settings
+                                                        </button>
+                                                        <button
+                                                            onClick={handleSheetImport}
+                                                            disabled={isImportingSheet || selectedTabs.size === 0}
+                                                            className="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                                                        >
+                                                            {isImportingSheet ? 'Syncing...' : 'Run Sync Now'}
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             )}
                                         </>

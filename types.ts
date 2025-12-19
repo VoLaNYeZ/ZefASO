@@ -36,6 +36,7 @@ export interface GoogleSheetSyncConfig {
   user_id: string;
   web_app_url: string;
   is_sync_enabled: boolean;
+  is_server_scheduled?: boolean;
   last_synced_at?: string;
   selected_tabs: string[];
 }
