@@ -88,7 +88,10 @@ const normalizeGeoCode = (geo: string): string => {
         // Full names / variants
         'UNITED STATES': 'US', 'USA': 'US',
         'UNITED KINGDOM': 'GB', 'UK': 'GB',
+        'NETHERLANDS': 'NL',
         'GERMANY': 'DE', 'FRANCE': 'FR', 'ITALY': 'IT', 'SPAIN': 'ES',
+        'SWEDEN': 'SE',
+        'SWITZERLAND': 'CH',
         'CANADA': 'CA', 'AUSTRALIA': 'AU', 'AUSTRIA': 'AT', 'JAPAN': 'JP', 'CHINA': 'CN',
         'BRAZIL': 'BR', 'INDIA': 'IN', 'RUSSIA': 'RU', 'SOUTH KOREA': 'KR', 'POLAND': 'PL', 'PO': 'PL',
         // 3-letter codes that sometimes appear

@@ -978,8 +978,9 @@ const App = () => {
 
     const getStoreUrl = (geo: string, id: string) => {
         // Map custom codes to Apple Store ISO codes
-        const isoMap: Record<string, string> = { 'UK': 'gb', 'EN': 'gb', 'SW': 'se', 'PO': 'pl' };
-        const code = (isoMap[geo] || geo).toLowerCase();
+        const isoMap: Record<string, string> = { 'UK': 'gb', 'EN': 'gb', 'NE': 'nl', 'SW': 'se', 'PO': 'pl' };
+        const key = geo.toUpperCase();
+        const code = (isoMap[key] || key).toLowerCase();
         return `https://apps.apple.com/${code}/app/id${id}`;
     };
 
