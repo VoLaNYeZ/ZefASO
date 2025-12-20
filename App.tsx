@@ -1069,6 +1069,7 @@ const App = () => {
             'UK': 'GB',
             'EN': 'GB',
             'SW': 'SE', // Sweden
+            'NE': 'NL', // Netherlands (non-standard, should be NL)
             'PO': 'PL', // Poland
         };
         const target = isoMap[code] || code;
