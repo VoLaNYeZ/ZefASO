@@ -1,4 +1,5 @@
 import { addDays, diffDays, formatDate, parseDate } from './date';
+import { normalizeAppCategoryMap, normalizeAppKey, normalizeAppKeyList } from './normalize';
 import { DEFAULT_WARNING_RULE_SETTINGS } from './defaults';
 import type { Severity, WarningItem, WarningRuleId, WarningRuleSetting, WarningsSettings } from './types';
 
@@ -67,8 +68,7 @@ const isValidDateString = (dateStr: string): boolean => {
 
 const getAppKey = (row: AsoRow): string | null => {
   const raw = (row.appGroup || row.appName) ?? '';
-  if (typeof raw !== 'string') return null;
-  const trimmed = raw.trim();
+  const trimmed = normalizeAppKey(raw);
   return trimmed ? trimmed : null;
 };
 
@@ -228,8 +228,8 @@ const buildMessage = (
 export function computeWarnings(input: ComputeInput): ComputeOutput {
   const rows = Array.isArray(input.rows) ? input.rows : [];
   const settings = input.settings;
-  const appCategoryMap = input.appCategoryMap || {};
-  const hiddenSet = new Set(Array.isArray(input.hiddenApps) ? input.hiddenApps : []);
+  const appCategoryMap = normalizeAppCategoryMap(input.appCategoryMap);
+  const hiddenSet = new Set(normalizeAppKeyList(input.hiddenApps));
   const today = isValidDateString(input.today) ? input.today : formatDate(new Date());
   const lang: 'en' | 'ru' = input.lang === 'ru' ? 'ru' : 'en';
 

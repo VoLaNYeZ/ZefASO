@@ -4,6 +4,7 @@ import type { CompetitorDetection, CompetitorTarget, FilterState } from '../../t
 import type { AsoRow, ComputeOutput } from './computeWarnings';
 import { computeWarnings } from './computeWarnings';
 import { addDays, formatDate } from './date';
+import { normalizeAppCategoryMap, normalizeAppKeyList } from './normalize';
 import type { Severity, WarningItem, WarningsSettings } from './types';
 import { saveWarningsSettings } from '../../lib/supabaseService';
 import { WarnSettingsModal } from './WarnSettingsModal';
@@ -92,18 +93,20 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savingFolders, setSavingFolders] = useState<Record<string, boolean>>({});
   const mountedRef = useRef(true);
+  const normalizedAppCategoryMap = useMemo(() => normalizeAppCategoryMap(appCategoryMap), [appCategoryMap]);
+  const normalizedHiddenApps = useMemo(() => normalizeAppKeyList(hiddenApps), [hiddenApps]);
 
   const computed = useMemo<ComputeOutput>(() => {
     return computeWarnings({
       rows,
       settings: warningsSettings,
       categories,
-      appCategoryMap,
-      hiddenApps,
+      appCategoryMap: normalizedAppCategoryMap,
+      hiddenApps: normalizedHiddenApps,
       today,
       lang,
     });
-  }, [rows, warningsSettings, categories, appCategoryMap, hiddenApps, today, lang]);
+  }, [rows, warningsSettings, categories, normalizedAppCategoryMap, normalizedHiddenApps, today, lang]);
 
   const pluralWarnings = (count: number): string => {
     const n = Math.abs(count);
@@ -136,7 +139,7 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
       if (!f || f === 'Uncategorized' || baseSet.has(f)) return;
       extra.add(f);
     });
-    Object.values(appCategoryMap || {}).forEach((f) => {
+    Object.values(normalizedAppCategoryMap || {}).forEach((f) => {
       if (typeof f !== 'string') return;
       const trimmed = f.trim();
       if (!trimmed || trimmed === 'Uncategorized' || baseSet.has(trimmed)) return;
@@ -145,17 +148,17 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
 
     const extraList = Array.from(extra).sort((a, b) => a.localeCompare(b));
     return [...base, ...extraList, 'Uncategorized'];
-  }, [categories, warningsSettings.folders, appCategoryMap]);
+  }, [categories, warningsSettings.folders, normalizedAppCategoryMap]);
 
   const appsByFolder = useMemo(() => {
-    const hiddenSet = new Set(Array.isArray(hiddenApps) ? hiddenApps : []);
+    const hiddenSet = new Set(normalizedHiddenApps);
     const folderToApps: Record<string, Set<string>> = {};
     folderOrder.forEach((f) => (folderToApps[f] = new Set()));
 
     for (const row of rows) {
       const appKey = (row?.appGroup || row?.appName || '').trim();
       if (!appKey || hiddenSet.has(appKey)) continue;
-      const folder = folderOf(appKey, appCategoryMap);
+      const folder = folderOf(appKey, normalizedAppCategoryMap);
       if (!folderToApps[folder]) folderToApps[folder] = new Set();
       folderToApps[folder].add(appKey);
     }
@@ -165,7 +168,7 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
       out[folder] = Array.from(folderToApps[folder]).sort((a, b) => a.localeCompare(b));
     });
     return out;
-  }, [rows, hiddenApps, appCategoryMap, folderOrder]);
+  }, [rows, normalizedHiddenApps, normalizedAppCategoryMap, folderOrder]);
 
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [expandedApps, setExpandedApps] = useState<Record<string, boolean>>({});
@@ -374,12 +377,12 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
       const appKey = (item?.targetAppName || '').trim();
       if (!appKey) return;
       byApp[appKey] = (byApp[appKey] || 0) + 1;
-      const folder = folderOf(appKey, appCategoryMap);
+      const folder = folderOf(appKey, normalizedAppCategoryMap);
       byFolder[folder] = (byFolder[folder] || 0) + 1;
       total += 1;
     });
     return { byApp, byFolder, total };
-  }, [competitorDetections, appCategoryMap]);
+  }, [competitorDetections, normalizedAppCategoryMap]);
 
   const competitorCount = competitorCounts.total;
   const trackingByApp = competitorTrackingByApp || {};
