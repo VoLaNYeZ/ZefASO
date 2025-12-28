@@ -16,12 +16,13 @@ interface DataUploadModalProps {
     theme: 'light' | 'dark';
     t: Translations;
     onSyncStatusChange?: (isActive: boolean) => void;
+    onRequestConfirm: (opts: { message: string; subMessage?: string; confirmText?: string; cancelText?: string }) => Promise<boolean>;
 }
 
 type ImportStrategy = 'existing' | 'new' | 'sheets';
 type InputMethod = 'paste' | 'file' | 'manual';
 
-export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClose, onAddData, selectedApp, activeApps, existingDataKeys, theme, t, onSyncStatusChange }) => {
+export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClose, onAddData, selectedApp, activeApps, existingDataKeys, theme, t, onSyncStatusChange, onRequestConfirm }) => {
     // Strategy State
     const [strategy, setStrategy] = useState<ImportStrategy>('existing');
 
@@ -108,7 +109,13 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
     };
 
     const handleDisconnect = async () => {
-        if (!confirm("Are you sure you want to disconnect the Google Sheet sync?")) return;
+        const confirmed = await onRequestConfirm({
+            message: t.disconnectSheetTitle || 'Disconnect Google Sheets sync?',
+            subMessage: t.disconnectSheetSub || 'You can reconnect later.',
+            confirmText: t.disconnectSheetConfirm || 'Disconnect',
+            cancelText: t.disconnectSheetCancel || 'Cancel'
+        });
+        if (!confirmed) return;
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;

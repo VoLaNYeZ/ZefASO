@@ -68,6 +68,46 @@ export interface AppAlias {
   isPrimary: boolean;
 }
 
+export interface CompetitorDetection {
+  id: string;
+  targetAppName: string;
+  targetAppId?: string | null;
+  targetBundleId?: string | null;
+  candidateKey: string;
+  candidateTrackId?: string | null;
+  candidateBundleId?: string | null;
+  candidateName: string;
+  candidateSeller?: string | null;
+  candidateGenre?: string | null;
+  candidateUrl?: string | null;
+  candidateArtworkUrl?: string | null;
+  candidateReleaseDate?: string | null;
+  candidateUpdateDate?: string | null;
+  score: number;
+  signals?: any;
+  foundIn?: { keyword: string; geo: string; rank: number }[];
+  isPotential?: boolean;
+  potentialReason?: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  isIgnored: boolean;
+  ignoredAt?: string | null;
+}
+
+export interface CompetitorTarget {
+  id: string;
+  appName: string;
+  appId?: string | null;
+  bundleId?: string | null;
+  keywords: string[];
+  geos: string[];
+  keywordGeoPairs: string[];
+  minScore: number;
+  isActive: boolean;
+  enablePotential?: boolean;
+  updatedAt?: string | null;
+}
+
 // Translation type - derived from i18n.ts structure
 import { translations } from './i18n';
 export type Translations = typeof translations.en;

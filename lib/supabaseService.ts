@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { AsoEntry } from '../types';
+import { AsoEntry, CompetitorDetection, CompetitorTarget } from '../types';
 import type { WarningsSettings } from '../src/warnings/types';
 
 // Get the current user ID
@@ -570,6 +570,196 @@ export const saveRealtimeRanking = async (ranking: RealtimeRanking): Promise<voi
 
     if (error) {
         console.error('Error saving realtime ranking:', error);
+    }
+};
+
+// ============================================
+// Competitor Tracker
+// ============================================
+
+export const loadCompetitorTargets = async (): Promise<CompetitorTarget[]> => {
+    const userId = await getUserId();
+
+    const { data, error } = await supabase
+        .from('competitor_targets')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true);
+
+    if (error) {
+        console.error('Error loading competitor targets:', error);
+        return [];
+    }
+
+    return (data || []).map((row: any) => ({
+        id: row.id?.toString?.() ?? row.id,
+        appName: row.app_name,
+        appId: row.app_id ?? null,
+        bundleId: row.bundle_id ?? null,
+        keywords: Array.isArray(row.keywords) ? row.keywords : [],
+        geos: Array.isArray(row.geos) ? row.geos : [],
+        keywordGeoPairs: Array.isArray(row.keyword_geo_pairs) ? row.keyword_geo_pairs : [],
+        minScore: Number(row.min_score) || 0.86,
+        isActive: !!row.is_active,
+        enablePotential: !!row.enable_potential,
+        updatedAt: row.updated_at ?? null
+    }));
+};
+
+export const upsertCompetitorTarget = async (input: {
+    appName: string;
+    appId?: string | null;
+    bundleId?: string | null;
+    keywords: string[];
+    geos: string[];
+    keywordGeoPairs: string[];
+    aliases?: string[];
+    developerNames?: string[];
+    minScore?: number;
+    isActive?: boolean;
+    enablePotential?: boolean;
+}): Promise<void> => {
+    const userId = await getUserId();
+
+    const payload = {
+        user_id: userId,
+        app_name: input.appName,
+        app_id: input.appId ?? null,
+        bundle_id: input.bundleId ?? null,
+        aliases: input.aliases || [],
+        keywords: input.keywords || [],
+        geos: input.geos || [],
+        keyword_geo_pairs: input.keywordGeoPairs || [],
+        developer_names: input.developerNames || [],
+        min_score: input.minScore ?? 0.86,
+        is_active: typeof input.isActive === 'boolean' ? input.isActive : true,
+        enable_potential: !!input.enablePotential,
+        updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+        .from('competitor_targets')
+        .upsert(payload, {
+            onConflict: 'user_id,app_name',
+            ignoreDuplicates: false
+        });
+
+    if (error) {
+        console.error('Error upserting competitor target:', error);
+        throw error;
+    }
+};
+
+export const setCompetitorTargetActive = async (appName: string, isActive: boolean): Promise<void> => {
+    const userId = await getUserId();
+    const payload = {
+        is_active: isActive,
+        updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+        .from('competitor_targets')
+        .update(payload)
+        .eq('user_id', userId)
+        .eq('app_name', appName);
+
+    if (error) {
+        console.error('Error updating competitor target:', error);
+        throw error;
+    }
+};
+
+export const setCompetitorTargetsActive = async (appNames: string[], isActive: boolean): Promise<void> => {
+    if (!Array.isArray(appNames) || appNames.length === 0) return;
+    const userId = await getUserId();
+    const payload = {
+        is_active: isActive,
+        updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+        .from('competitor_targets')
+        .update(payload)
+        .eq('user_id', userId)
+        .in('app_name', appNames);
+
+    if (error) {
+        console.error('Error updating competitor targets:', error);
+        throw error;
+    }
+};
+
+export const loadCompetitorDetections = async (): Promise<CompetitorDetection[]> => {
+    const userId = await getUserId();
+
+    const { data, error } = await supabase
+        .from('competitor_detections')
+        .select('*')
+        .eq('user_id', userId)
+        .order('last_seen_at', { ascending: false });
+
+    if (error) {
+        console.error('Error loading competitor detections:', error);
+        return [];
+    }
+
+    return (data || []).map((row: any) => ({
+        id: row.id?.toString?.() ?? row.id,
+        targetAppName: row.target_app_name,
+        targetAppId: row.target_app_id ?? null,
+        targetBundleId: row.target_bundle_id ?? null,
+        candidateKey: row.candidate_key,
+        candidateTrackId: row.candidate_track_id ?? null,
+        candidateBundleId: row.candidate_bundle_id ?? null,
+        candidateName: row.candidate_name,
+        candidateSeller: row.candidate_seller ?? null,
+        candidateGenre: row.candidate_genre ?? null,
+        candidateUrl: row.candidate_url ?? null,
+        candidateArtworkUrl: row.candidate_artwork_url ?? null,
+        candidateReleaseDate: row.candidate_release_date ?? null,
+        candidateUpdateDate: row.candidate_update_date ?? null,
+        score: Number(row.score) || 0,
+        signals: row.signals ?? null,
+        foundIn: row.found_in ?? null,
+        isPotential: !!row.is_potential,
+        potentialReason: row.potential_reason ?? null,
+        firstSeenAt: row.first_seen_at,
+        lastSeenAt: row.last_seen_at,
+        isIgnored: !!row.is_ignored,
+        ignoredAt: row.ignored_at ?? null
+    }));
+};
+
+export const setCompetitorDetectionIgnored = async (id: string, ignored: boolean): Promise<void> => {
+    const userId = await getUserId();
+    const payload = {
+        is_ignored: ignored,
+        ignored_at: ignored ? new Date().toISOString() : null
+    };
+
+    const { error } = await supabase
+        .from('competitor_detections')
+        .update(payload)
+        .eq('id', id)
+        .eq('user_id', userId);
+
+    if (error) {
+        console.error('Error updating competitor ignore state:', error);
+        throw error;
+    }
+};
+
+export const deleteCompetitorDetectionsForApp = async (appName: string): Promise<void> => {
+    const userId = await getUserId();
+    const { error } = await supabase
+        .from('competitor_detections')
+        .delete()
+        .eq('user_id', userId)
+        .eq('target_app_name', appName);
+
+    if (error) {
+        console.error('Error deleting competitor detections:', error);
+        throw error;
     }
 };
 

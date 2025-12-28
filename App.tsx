@@ -53,7 +53,7 @@ import {
     Loader2
 } from 'lucide-react';
 import { INITIAL_DATA } from './constants';
-import { AsoEntry, AppAlias, FilterState, Granularity } from './types';
+import { AsoEntry, AppAlias, CompetitorDetection, CompetitorTarget, FilterState, Granularity } from './types';
 import { translations } from './i18n';
 import { DashboardCharts } from './components/DashboardCharts';
 import { DataUploadModal } from './components/DataUploadModal';
@@ -66,7 +66,7 @@ import { KeywordSuggester } from './components/KeywordSuggester';
 import { supabase } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
-import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, loadAppAliases, saveAppAliasesForApp, deleteAsoEntriesForAppGroup, loadWarningsSettings } from './lib/supabaseService';
+import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, loadAppAliases, saveAppAliasesForApp, deleteAsoEntriesForAppGroup, loadWarningsSettings, loadCompetitorDetections, setCompetitorDetectionIgnored, loadCompetitorTargets, upsertCompetitorTarget, setCompetitorTargetActive, setCompetitorTargetsActive, deleteCompetitorDetectionsForApp } from './lib/supabaseService';
 import { fetchSheetData, fetchSheetTabs, processSheetData } from './services/googleSheets';
 import { ALL_TABS_SENTINEL, buildStoredTabsAllExcept, resolveTabsToSync } from './utils/googleSheetsSync';
 import { BalancePanel } from './components/BalancePanel';
@@ -79,6 +79,36 @@ import type { WarningRuleId, WarningRuleSetting, WarningsSettings } from './src/
 import { extractNumericId, useAppStoreBanCheck } from './src/appstore/useAppStoreBanCheck';
 
 const VIEW_MODE_COOKIE = 'zeyf_view_mode';
+const COMPETITOR_TRACKER_ALLOWLIST = new Set(
+    (import.meta.env.VITE_COMPETITOR_TRACKER_ALLOWLIST || '')
+        .split(',')
+        .map(value => value.trim().toLowerCase())
+        .filter(Boolean)
+);
+const TRACK_STOPWORDS = new Set([
+    'app',
+    'apps',
+    'pro',
+    'lite',
+    'free',
+    'the',
+    'and',
+    'for',
+    'mobile',
+    'official',
+    'studio',
+    'vpn',
+    'ai',
+    'tool',
+    'tools',
+    'editor',
+    'photo',
+    'video',
+    'music',
+    'game',
+    'games',
+    'plus'
+]);
 
 const readViewModeCookie = (): 'full' | 'mini' | 'combined' => {
     if (typeof document === 'undefined') return 'mini';
@@ -218,6 +248,11 @@ const App = () => {
     const [warningsSettings, setWarningsSettings] = useState<WarningsSettings>(() =>
         buildDefaultWarningsSettings(['General'], [], { monitorEnabledDefault: false, initialized: false })
     );
+    const [competitorDetections, setCompetitorDetections] = useState<CompetitorDetection[]>([]);
+    const [competitorTargets, setCompetitorTargets] = useState<CompetitorTarget[]>([]);
+    const [competitorRefreshing, setCompetitorRefreshing] = useState(false);
+    const [competitorTrackingByApp, setCompetitorTrackingByApp] = useState<Record<string, boolean>>({});
+    const [competitorTrackingByFolder, setCompetitorTrackingByFolder] = useState<Record<string, boolean>>({});
     const [lang, setLang] = useState<'en' | 'ru'>('en');
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
     const [isSyncConfigured, setIsSyncConfigured] = useState(false);
@@ -253,6 +288,8 @@ const App = () => {
             currentUserId.current = null;
             hasUserAddedData.current = false;
             setWarningsSettings(buildDefaultWarningsSettings(['General'], [], { monitorEnabledDefault: false, initialized: false }));
+            setCompetitorDetections([]);
+            setCompetitorTargets([]);
             return;
         }
 
@@ -266,7 +303,7 @@ const App = () => {
         const loadInitialData = async () => {
             setDataLoading(true);
             try {
-                const [asoDataRaw, appSettings, userPrefs, hasSyncConfig, isExistingUser, syncResult, aliases, savedWarningsSettings] = await Promise.all([
+                const [asoDataRaw, appSettings, userPrefs, hasSyncConfig, isExistingUser, syncResult, aliases, savedWarningsSettings, loadedCompetitors, loadedCompetitorTargets] = await Promise.all([
                     loadAsoData(),
                     loadAppSettings(),
                     loadUserPreferences(),
@@ -274,7 +311,9 @@ const App = () => {
                     checkIsExistingUser(),
                     supabase.from('google_sheets_sync').select('last_synced_at').eq('user_id', userId).maybeSingle(),
                     loadAppAliases(),
-                    loadWarningsSettings()
+                    loadWarningsSettings(),
+                    loadCompetitorDetections(),
+                    loadCompetitorTargets()
                 ]);
 
                 const testAppNames = new Set(['SecretBen', 'FitnessPro']);
@@ -307,6 +346,8 @@ const App = () => {
                 });
                 const mergedWarnings = mergeWarningsSettings(savedWarningsSettings, defaultWarnings);
                 setWarningsSettings(mergedWarnings);
+                setCompetitorDetections(Array.isArray(loadedCompetitors) ? loadedCompetitors : []);
+                setCompetitorTargets(Array.isArray(loadedCompetitorTargets) ? loadedCompetitorTargets : []);
 
                 // Only show INITIAL_DATA if this is a brand new user:
                 // 1. No data loaded AND
@@ -502,6 +543,20 @@ const App = () => {
     const [isTickling, setIsTickling] = useState(false);
     const [tickleMsg, setTickleMsg] = useState<string | null>(null);
     const tickleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [confirmDialog, setConfirmDialog] = useState<{
+        message: string;
+        subMessage?: string;
+        confirmText?: string;
+        cancelText?: string;
+        resolve: (value: boolean) => void;
+    } | null>(null);
+    const canUseCompetitorTracker = useMemo(() => {
+        if (!session?.user) return false;
+        if (COMPETITOR_TRACKER_ALLOWLIST.has('*')) return true;
+        const email = session.user.email?.toLowerCase() || '';
+        return COMPETITOR_TRACKER_ALLOWLIST.has(session.user.id) ||
+            (email ? COMPETITOR_TRACKER_ALLOWLIST.has(email) : false);
+    }, [session]);
 
     const formatAliasLabel = (alias?: AppAlias | null) => {
         if (!alias || (!alias.prefix && !alias.number)) return null;
@@ -509,9 +564,28 @@ const App = () => {
         return alias.prefix || alias.number;
     };
 
+    const requestConfirmation = (opts: {
+        message: string;
+        subMessage?: string;
+        confirmText?: string;
+        cancelText?: string;
+    }) => {
+        return new Promise<boolean>((resolve) => {
+            setConfirmDialog({ ...opts, resolve });
+        });
+    };
+
+    const closeConfirmDialog = (value: boolean) => {
+        setConfirmDialog((prev) => {
+            if (prev) prev.resolve(value);
+            return null;
+        });
+    };
+
     useEffect(() => {
         persistViewModeCookie(viewMode);
     }, [viewMode]);
+
 
     const handleSaveAliases = async (appName: string, rows: { appId: string; prefix: string; number: string; isPrimary: boolean }[]) => {
         const cleaned = rows.map(r => ({
@@ -522,6 +596,446 @@ const App = () => {
         }));
         const saved = await saveAppAliasesForApp(appName, cleaned);
         setAppAliases(prev => ({ ...prev, [appName]: saved }));
+    };
+
+    const normalizeTrackName = (value: string) => {
+        if (!value) return '';
+        return value
+            .normalize('NFKD')
+            .replace(/\p{M}/gu, '')
+            .toLowerCase()
+            .replace(/[^\p{L}\p{N}]+/gu, ' ')
+            .trim();
+    };
+
+    const getTrackTokens = (value: string) => {
+        const normalized = normalizeTrackName(value);
+        if (!normalized) return [];
+        return normalized
+            .split(/\s+/)
+            .filter(token => token && !TRACK_STOPWORDS.has(token));
+    };
+
+    const isShortTrackName = (value: string) => {
+        const tokens = getTrackTokens(value);
+        const joined = tokens.join('');
+        return joined.length > 0 && joined.length <= 3;
+    };
+
+    const computeKeywordGeoPairs = (appKey: string, maxPairs?: number) => {
+        const today = formatDate(new Date());
+        const startDate = addDays(today, -29);
+        const pairsMap = new Map<string, { keyword: string; geo: string; installs: number }>();
+        const appIdInstalls = new Map<string, number>();
+
+        data.forEach((row) => {
+            const group = (row.appGroup || row.appName || '').trim();
+            if (!group || group !== appKey) return;
+            if (!row.date || row.date < startDate || row.date > today) return;
+
+            const keyword = (row.keyword || '').trim();
+            const geo = (row.geo || '').trim();
+            if (!keyword || !geo) return;
+            if (keyword.toLowerCase() === 'all' || geo.toLowerCase() === 'all') return;
+
+            const installs = Number(row.installs) || 0;
+            const pairKey = `${keyword}::${geo}`;
+            const current = pairsMap.get(pairKey) || { keyword, geo, installs: 0 };
+            current.installs += installs;
+            pairsMap.set(pairKey, current);
+
+            const appId = (row.appId || '').trim();
+            if (appId) {
+                appIdInstalls.set(appId, (appIdInstalls.get(appId) || 0) + installs);
+            }
+        });
+
+        let pairs = Array.from(pairsMap.values())
+            .sort((a, b) => b.installs - a.installs)
+            .map((pair) => ({ keyword: pair.keyword, geo: pair.geo }));
+
+        if (typeof maxPairs === 'number' && maxPairs > 0) {
+            pairs = pairs.slice(0, maxPairs);
+        }
+
+        const topAppId = Array.from(appIdInstalls.entries())
+            .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+        return { pairs, topAppId, startDate, today };
+    };
+
+    const setTrackingByApp = (appKey: string, isTracking: boolean) => {
+        if (!appKey) return;
+        setCompetitorTrackingByApp(prev => {
+            if (isTracking) {
+                if (prev[appKey]) return prev;
+                return { ...prev, [appKey]: true };
+            }
+            if (!prev[appKey]) return prev;
+            const next = { ...prev };
+            delete next[appKey];
+            return next;
+        });
+    };
+
+    const setTrackingByApps = (appKeys: string[], isTracking: boolean) => {
+        if (!Array.isArray(appKeys) || appKeys.length === 0) return;
+        setCompetitorTrackingByApp(prev => {
+            let changed = false;
+            const next = { ...prev };
+            appKeys.forEach((appKey) => {
+                if (!appKey) return;
+                if (isTracking) {
+                    if (!next[appKey]) {
+                        next[appKey] = true;
+                        changed = true;
+                    }
+                } else if (next[appKey]) {
+                    delete next[appKey];
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    };
+
+    const setTrackingByFolder = (folderKey: string | undefined, isTracking: boolean) => {
+        if (!folderKey) return;
+        setCompetitorTrackingByFolder(prev => {
+            if (isTracking) {
+                if (prev[folderKey]) return prev;
+                return { ...prev, [folderKey]: true };
+            }
+            if (!prev[folderKey]) return prev;
+            const next = { ...prev };
+            delete next[folderKey];
+            return next;
+        });
+    };
+
+    const handleToggleCompetitorIgnored = async (id: string, ignored: boolean) => {
+        setCompetitorDetections(prev => prev.map(item => (
+            item.id === id
+                ? { ...item, isIgnored: ignored, ignoredAt: ignored ? new Date().toISOString() : null }
+                : item
+        )));
+        try {
+            await setCompetitorDetectionIgnored(id, ignored);
+        } catch (error) {
+            console.error('Failed to update competitor ignore state:', error);
+            try {
+                const refreshed = await loadCompetitorDetections();
+                setCompetitorDetections(refreshed);
+            } catch (refreshError) {
+                console.error('Failed to reload competitor detections:', refreshError);
+            }
+        }
+    };
+
+    const handleToggleCompetitorTracking = async (appKey: string, isActive: boolean) => {
+        setCompetitorTargets(prev => prev.map(target => (
+            target.appName === appKey
+                ? { ...target, isActive }
+                : target
+        )));
+        try {
+            await setCompetitorTargetActive(appKey, isActive);
+        } catch (error) {
+            console.error('Failed to update competitor tracking state:', error);
+            try {
+                const refreshedTargets = await loadCompetitorTargets();
+                setCompetitorTargets(refreshedTargets);
+            } catch (refreshError) {
+                console.error('Failed to reload competitor targets:', refreshError);
+            }
+        }
+    };
+
+    const handleToggleCompetitorTrackingFolder = async (appKeys: string[], isActive: boolean) => {
+        if (!Array.isArray(appKeys) || appKeys.length === 0) return;
+        const appSet = new Set(appKeys);
+        setCompetitorTargets(prev => prev.map(target => (
+            appSet.has(target.appName)
+                ? { ...target, isActive }
+                : target
+        )));
+        try {
+            await setCompetitorTargetsActive(appKeys, isActive);
+        } catch (error) {
+            console.error('Failed to update competitor folder tracking state:', error);
+            try {
+                const refreshedTargets = await loadCompetitorTargets();
+                setCompetitorTargets(refreshedTargets);
+            } catch (refreshError) {
+                console.error('Failed to reload competitor targets:', refreshError);
+            }
+        }
+    };
+
+    const handleDeleteCompetitors = async (appKey: string) => {
+        const confirmed = await requestConfirmation({
+            message: lang === 'ru'
+                ? `Очистить конкурентов для "${appKey}"?`
+                : `Clear competitors for "${appKey}"?`,
+            subMessage: lang === 'ru' ? 'Это действие нельзя отменить.' : 'This action cannot be undone.',
+            confirmText: lang === 'ru' ? 'Очистить' : 'Clear',
+            cancelText: lang === 'ru' ? 'Отмена' : 'Cancel'
+        });
+        if (!confirmed) return;
+        setCompetitorDetections(prev => prev.filter(item => item.targetAppName !== appKey));
+        try {
+            await deleteCompetitorDetectionsForApp(appKey);
+        } catch (error) {
+            console.error('Failed to delete competitors:', error);
+            try {
+                const refreshed = await loadCompetitorDetections();
+                setCompetitorDetections(refreshed);
+            } catch (refreshError) {
+                console.error('Failed to reload competitor detections:', refreshError);
+            }
+        }
+    };
+
+    const handleRefreshCompetitors = async () => {
+        if (!sessionUserId) {
+            console.warn('Not authenticated');
+            return;
+        }
+
+        const activeTargets = competitorTargets.filter(target => target.isActive);
+        if (activeTargets.length === 0) {
+            const msg = lang === 'ru'
+                ? 'Нет активных приложений для трекинга'
+                : 'No active apps to track';
+            alert(msg);
+            return;
+        }
+
+        setCompetitorRefreshing(true);
+        try {
+            const apps = activeTargets.map(target => ({
+                appName: target.appName,
+                appId: target.appId ?? undefined,
+                bundleId: target.bundleId ?? undefined,
+                keywords: target.keywords || [],
+                geos: target.geos || [],
+                keywordGeoPairs: target.keywordGeoPairs || [],
+                enablePotential: !!target.enablePotential
+            }));
+
+            const maxPairs = apps.reduce((max, app) => {
+                const directPairs = Array.isArray(app.keywordGeoPairs) ? app.keywordGeoPairs.length : 0;
+                const fallbackPairs = (app.keywords?.length || 0) * (app.geos?.length || 0);
+                return Math.max(max, directPairs || fallbackPairs);
+            }, 0);
+
+            const { error } = await supabase.functions.invoke('competitor-tracker', {
+                body: {
+                    apps,
+                    storeResults: true,
+                    maxKeywordGeos: Math.min(500, maxPairs || 1),
+                    enablePotential: false
+                }
+            });
+
+            if (error) throw error;
+
+            const [refreshedDetections, refreshedTargets] = await Promise.all([
+                loadCompetitorDetections(),
+                loadCompetitorTargets()
+            ]);
+            setCompetitorDetections(refreshedDetections);
+            setCompetitorTargets(refreshedTargets);
+        } catch (error) {
+            console.error('Failed to refresh competitors:', error);
+        } finally {
+            setCompetitorRefreshing(false);
+        }
+    };
+
+    const handleTrackCompetitors = async (appKey: string, maxPairs?: number, enablePotential?: boolean) => {
+        if (!sessionUserId) {
+            console.warn('Not authenticated');
+            return;
+        }
+
+        if (isShortTrackName(appKey)) {
+            const message = lang === 'ru'
+                ? `Название "${appKey}" слишком короткое и может дать много ложных совпадений.`
+                : `The name "${appKey}" is very short and may produce many false matches.`;
+            const confirmed = await requestConfirmation({
+                message,
+                confirmText: lang === 'ru' ? 'Продолжить' : 'Continue',
+                cancelText: lang === 'ru' ? 'Отмена' : 'Cancel'
+            });
+            if (!confirmed) return;
+        }
+
+        const { pairs, topAppId, startDate, today } = computeKeywordGeoPairs(appKey, maxPairs);
+        if (pairs.length === 0) {
+            const msg = lang === 'ru'
+                ? `Нет данных за ${startDate} — ${today}`
+                : `No data for ${startDate} — ${today}`;
+            alert(msg);
+            return;
+        }
+
+        const keywordGeoPairs = pairs.map((pair) => `${pair.keyword}::${pair.geo}`);
+        const keywords = Array.from(new Set(pairs.map((pair) => pair.keyword)));
+        const geos = Array.from(new Set(pairs.map((pair) => pair.geo)));
+
+        setTrackingByApp(appKey, true);
+        try {
+            await upsertCompetitorTarget({
+                appName: appKey,
+                appId: topAppId,
+                keywords,
+                geos,
+                keywordGeoPairs,
+                isActive: true,
+                enablePotential: !!enablePotential
+            });
+
+            const { error } = await supabase.functions.invoke('competitor-tracker', {
+                body: {
+                    apps: [{
+                        appName: appKey,
+                        appId: topAppId ?? undefined,
+                        keywords,
+                        geos,
+                        keywordGeoPairs: pairs,
+                        enablePotential: !!enablePotential
+                    }],
+                    storeResults: true,
+                    maxKeywordGeos: Math.min(500, keywordGeoPairs.length || 1),
+                    enablePotential: !!enablePotential
+                }
+            });
+
+            if (error) throw error;
+
+            const [refreshedDetections, refreshedTargets] = await Promise.all([
+                loadCompetitorDetections(),
+                loadCompetitorTargets()
+            ]);
+            setCompetitorDetections(refreshedDetections);
+            setCompetitorTargets(refreshedTargets);
+        } catch (error) {
+            console.error('Failed to save competitor target:', error);
+        } finally {
+            setTrackingByApp(appKey, false);
+        }
+    };
+
+    const handleTrackCompetitorsFolder = async (appKeys: string[], maxPairs?: number, enablePotential?: boolean, folderKey?: string) => {
+        if (!sessionUserId) {
+            console.warn('Not authenticated');
+            return;
+        }
+        if (!Array.isArray(appKeys) || appKeys.length === 0) return;
+
+        const shortApps = appKeys.filter((name) => isShortTrackName(name));
+        if (shortApps.length > 0) {
+            const preview = shortApps.slice(0, 3).join(', ');
+            const suffix = shortApps.length > 3 ? ` +${shortApps.length - 3}` : '';
+            const message = lang === 'ru'
+                ? `В папке есть короткие названия (${preview}${suffix}). Это может дать много ложных совпадений.`
+                : `This folder contains very short names (${preview}${suffix}), which may produce many false matches.`;
+            const confirmed = await requestConfirmation({
+                message,
+                confirmText: lang === 'ru' ? 'Продолжить' : 'Continue',
+                cancelText: lang === 'ru' ? 'Отмена' : 'Cancel'
+            });
+            if (!confirmed) return;
+        }
+
+        const payloadApps: {
+            appName: string;
+            appId?: string;
+            keywords: string[];
+            geos: string[];
+            keywordGeoPairs: { keyword: string; geo: string }[];
+        }[] = [];
+        const upserts: Promise<void>[] = [];
+        const missingApps: string[] = [];
+        let totalPairs = 0;
+        let startDate = '';
+        let today = '';
+
+        appKeys.forEach((appKey) => {
+            const result = computeKeywordGeoPairs(appKey, maxPairs);
+            startDate = result.startDate;
+            today = result.today;
+            if (result.pairs.length === 0) {
+                missingApps.push(appKey);
+                return;
+            }
+
+            const keywordGeoPairs = result.pairs.map((pair) => `${pair.keyword}::${pair.geo}`);
+            const keywords = Array.from(new Set(result.pairs.map((pair) => pair.keyword)));
+            const geos = Array.from(new Set(result.pairs.map((pair) => pair.geo)));
+
+            upserts.push(upsertCompetitorTarget({
+                appName: appKey,
+                appId: result.topAppId,
+                keywords,
+                geos,
+                keywordGeoPairs,
+                isActive: true,
+                enablePotential: !!enablePotential
+            }));
+
+            payloadApps.push({
+                appName: appKey,
+                appId: result.topAppId ?? undefined,
+                keywords,
+                geos,
+                keywordGeoPairs: result.pairs,
+                enablePotential: !!enablePotential
+            });
+            totalPairs += keywordGeoPairs.length;
+        });
+
+        if (payloadApps.length === 0) {
+            const msg = lang === 'ru'
+                ? `Нет данных за ${startDate} - ${today}`
+                : `No data for ${startDate} - ${today}`;
+            alert(msg);
+            return;
+        }
+
+        setTrackingByApps(appKeys, true);
+        setTrackingByFolder(folderKey, true);
+        try {
+            await Promise.all(upserts);
+
+            const { error } = await supabase.functions.invoke('competitor-tracker', {
+                body: {
+                    apps: payloadApps,
+                    storeResults: true,
+                    maxKeywordGeos: Math.min(500, totalPairs || 1),
+                    enablePotential: !!enablePotential
+                }
+            });
+
+            if (error) throw error;
+
+            const [refreshedDetections, refreshedTargets] = await Promise.all([
+                loadCompetitorDetections(),
+                loadCompetitorTargets()
+            ]);
+            setCompetitorDetections(refreshedDetections);
+            setCompetitorTargets(refreshedTargets);
+        } catch (error) {
+            console.error('Failed to track competitor folder:', error);
+        } finally {
+            setTrackingByApps(appKeys, false);
+            setTrackingByFolder(folderKey, false);
+        }
+
+        if (missingApps.length > 0) {
+            console.warn('Skipped apps without data:', missingApps);
+        }
     };
 
     // UI State for Moving Apps
@@ -2251,6 +2765,19 @@ const App = () => {
                              setWarningsSettings={setWarningsSettings}
                              setCurrentPage={setCurrentPage}
                              setFilters={setFilters}
+                             competitorDetections={competitorDetections}
+                             onToggleCompetitorIgnored={handleToggleCompetitorIgnored}
+                             competitorTargets={competitorTargets}
+                             onTrackCompetitors={handleTrackCompetitors}
+                             onTrackCompetitorsFolder={handleTrackCompetitorsFolder}
+                             onToggleCompetitorTracking={handleToggleCompetitorTracking}
+                             onToggleCompetitorTrackingFolder={handleToggleCompetitorTrackingFolder}
+                             onRefreshCompetitors={handleRefreshCompetitors}
+                             competitorRefreshing={competitorRefreshing}
+                             onDeleteCompetitors={handleDeleteCompetitors}
+                             competitorTrackingByApp={competitorTrackingByApp}
+                             competitorTrackingByFolder={competitorTrackingByFolder}
+                             competitorTrackerEnabled={canUseCompetitorTracker}
                          />
                      </div>
                  ) : (
@@ -2774,6 +3301,7 @@ const App = () => {
                 existingDataKeys={existingDataKeys}
                 theme={theme}
                 t={t}
+                onRequestConfirm={requestConfirmation}
             />
 
             {/* Delete Confirmation Modal */}
@@ -2870,6 +3398,41 @@ const App = () => {
                                     className="px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-colors"
                                 >
                                     Yes, Update
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Generic Confirmation Modal */}
+            {confirmDialog && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden scale-100 animate-in zoom-in-95 duration-200 border dark:border-slate-800">
+                        <div className="p-6 text-center">
+                            <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <AlertTriangle size={28} />
+                            </div>
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
+                                {confirmDialog.message}
+                            </h3>
+                            {confirmDialog.subMessage && (
+                                <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+                                    {confirmDialog.subMessage}
+                                </p>
+                            )}
+                            <div className="flex gap-3 justify-center">
+                                <button
+                                    onClick={() => closeConfirmDialog(false)}
+                                    className="px-5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                    {confirmDialog.cancelText || (lang === 'ru' ? 'Отмена' : 'Cancel')}
+                                </button>
+                                <button
+                                    onClick={() => closeConfirmDialog(true)}
+                                    className="px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-colors"
+                                >
+                                    {confirmDialog.confirmText || (lang === 'ru' ? 'Подтвердить' : 'Confirm')}
                                 </button>
                             </div>
                         </div>
