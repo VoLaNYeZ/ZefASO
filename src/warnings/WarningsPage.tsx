@@ -170,6 +170,10 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
     return out;
   }, [rows, normalizedHiddenApps, normalizedAppCategoryMap, folderOrder]);
 
+  const foldersWithApps = useMemo(() => {
+    return folderOrder.filter((folder) => (appsByFolder[folder] || []).length > 0);
+  }, [folderOrder, appsByFolder]);
+
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [expandedApps, setExpandedApps] = useState<Record<string, boolean>>({});
   const [settingsAppKey, setSettingsAppKey] = useState<string | null>(null);
@@ -668,7 +672,7 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
       )}
 
       <div className="space-y-4">
-        {folderOrder.map((folder) => {
+        {foldersWithApps.map((folder) => {
           const monitorEnabled = getMonitorEnabled(warningsSettings, folder);
           const expanded = expandedFolders[folder] ?? monitorEnabled;
           const folderCount = safeInt(computed.counts.byFolder?.[folder] || 0);
@@ -983,7 +987,7 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
             </div>
           </div>
 
-          {folderOrder.map((folder) => {
+          {foldersWithApps.map((folder) => {
             const expanded = trackerExpandedFolders[folder] ?? (competitorCounts.byFolder[folder] || 0) > 0;
             const folderCount = safeInt(competitorCounts.byFolder?.[folder] || 0);
             const folderPairCount = safeInt(competitorPairCountsByFolder[folder] || 0);
