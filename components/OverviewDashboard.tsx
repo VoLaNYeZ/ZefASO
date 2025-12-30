@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { AsoEntry } from '../types';
 import { DateRangePicker } from './DateRangePicker';
+import { extractNumericId } from '../src/appstore/useAppStoreBanCheck';
 
 interface OverviewDashboardProps {
     data: AsoEntry[];
@@ -845,8 +846,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                     <div className="flex flex-wrap gap-1.5 mt-2">
                                         {Array.from(new Set(data.filter(d => (d.appGroup || d.appName) === app.appName).map(d => d.geo))).sort().map(geo => {
                                             const entry = data.find(d => (d.appGroup || d.appName) === app.appName && d.geo === geo);
-                                            const match = entry?.appId.match(/(\d+)/);
-                                            const id = match ? match[0] : '';
+                                            const id = extractNumericId(entry?.appId);
                                             if (!id) return null;
                                             return (
                                                 <a

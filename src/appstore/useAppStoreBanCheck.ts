@@ -7,11 +7,18 @@ const APPSTORE_OK_TTL_MS = 1000 * 60 * 60 * 24; // 24h
 
 type AppStoreStatusCacheEntry = { status: 'banned' | 'ok'; checkedAt?: number };
 type AppStoreStatusCache = Record<string, AppStoreStatusCacheEntry>;
+type AppStoreStatusRow = {
+    app_id: string;
+    status: 'banned' | 'ok';
+    checked_at?: string | null;
+    updated_at?: string | null;
+};
 
 export const extractNumericId = (raw: unknown): string | null => {
     if (typeof raw !== 'string') return null;
-    const match = raw.match(/(\d+)/);
-    return match ? match[0] : null;
+    const matches = raw.match(/(\d+)/g);
+    if (!matches || matches.length === 0) return null;
+    return matches[matches.length - 1];
 };
 
 const normalizeItunesCountryCode = (geo: unknown): string | null => {
@@ -90,6 +97,33 @@ const isOkFresh = (entry: AppStoreStatusCacheEntry | undefined) => {
     return (Date.now() - entry.checkedAt) < APPSTORE_OK_TTL_MS;
 };
 
+const parseCheckedAtMs = (value: unknown): number | undefined => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value !== 'string') return undefined;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const mergeStatusEntry = (
+    current: AppStoreStatusCacheEntry | undefined,
+    incoming: AppStoreStatusCacheEntry
+): AppStoreStatusCacheEntry => {
+    if (!current) return incoming;
+
+    if (current.status === 'banned') {
+        if (incoming.status !== 'banned') return current;
+        const currentTime = current.checkedAt ?? 0;
+        const incomingTime = incoming.checkedAt ?? 0;
+        return incomingTime > currentTime ? incoming : current;
+    }
+
+    if (incoming.status === 'banned') return incoming;
+
+    const currentTime = current.checkedAt ?? 0;
+    const incomingTime = incoming.checkedAt ?? 0;
+    return incomingTime > currentTime ? incoming : current;
+};
+
 export type UseAppStoreBanCheckInput = {
     supabase: SupabaseClient;
     sessionUserId: string | null;
@@ -128,6 +162,15 @@ export const useAppStoreBanCheck = (input: UseAppStoreBanCheckInput) => {
     const appStoreStatusCacheRef = useRef<AppStoreStatusCache>({});
     const banCheckAttemptedRef = useRef<Set<string>>(new Set());
 
+    const activeNumericIds = useMemo(() => {
+        const out = new Set<string>();
+        activeApps.forEach(appKey => {
+            const numericId = extractNumericId(latestIdByGroup[appKey]);
+            if (numericId) out.add(numericId);
+        });
+        return Array.from(out);
+    }, [activeApps, latestIdByGroup]);
+
     useEffect(() => {
         banCheckAttemptedRef.current = new Set();
         if (!sessionUserId) {
@@ -149,10 +192,84 @@ export const useAppStoreBanCheck = (input: UseAppStoreBanCheckInput) => {
     }, [sessionUserId]);
 
     useEffect(() => {
+        if (!sessionUserId || dataLoading || activeNumericIds.length === 0) return;
+        let isMounted = true;
+
+        const run = async () => {
+            const { data: rows, error } = await supabase
+                .from('appstore_status_cache')
+                .select('app_id,status,checked_at,updated_at')
+                .in('app_id', activeNumericIds);
+
+            if (!isMounted || error || !rows) return;
+
+            const nextCache: AppStoreStatusCache = { ...appStoreStatusCacheRef.current };
+            const bannedUpdates: Record<string, true> = {};
+            let changed = false;
+
+            (rows as AppStoreStatusRow[]).forEach((row) => {
+                const numericId = typeof row.app_id === 'string' ? row.app_id.trim() : '';
+                if (!/^\d+$/.test(numericId)) return;
+
+                const status = row.status === 'banned' || row.status === 'ok' ? row.status : null;
+                if (!status) return;
+
+                const checkedAt = parseCheckedAtMs(row.checked_at) ?? parseCheckedAtMs(row.updated_at);
+                const incoming: AppStoreStatusCacheEntry = { status, checkedAt };
+                const merged = mergeStatusEntry(nextCache[numericId], incoming);
+
+                if (merged !== nextCache[numericId]) {
+                    nextCache[numericId] = merged;
+                    changed = true;
+                }
+
+                if (merged.status === 'banned') {
+                    bannedUpdates[numericId] = true;
+                    banCheckAttemptedRef.current.add(numericId);
+                }
+            });
+
+            if (!isMounted) return;
+
+            if (changed) {
+                appStoreStatusCacheRef.current = nextCache;
+                writeAppStoreStatusCache(sessionUserId, nextCache);
+            }
+
+            if (Object.keys(bannedUpdates).length > 0) {
+                setBannedAppIds(prev => ({ ...prev, ...bannedUpdates }));
+            }
+        };
+
+        run();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [supabase, sessionUserId, dataLoading, activeNumericIds]);
+
+    useEffect(() => {
         if (!sessionUserId || dataLoading) return;
         let isMounted = true;
 
         const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+        const persistStatusToRemote = async (numericId: string, status: 'banned' | 'ok') => {
+            if (!sessionUserId) return;
+            const timestamp = new Date().toISOString();
+            const { error } = await supabase
+                .from('appstore_status_cache')
+                .upsert({
+                    user_id: sessionUserId,
+                    app_id: numericId,
+                    status,
+                    checked_at: timestamp,
+                    updated_at: timestamp
+                }, { onConflict: 'user_id,app_id' });
+
+            if (error) {
+                console.warn('Failed to persist App Store status:', error);
+            }
+        };
 
         const run = async () => {
             await sleep(1800);
@@ -193,6 +310,7 @@ export const useAppStoreBanCheck = (input: UseAppStoreBanCheckInput) => {
                         };
                         appStoreStatusCacheRef.current = nextCache;
                         writeAppStoreStatusCache(sessionUserId, nextCache);
+                        await persistStatusToRemote(numericId, 'banned');
                     } else if (resultCount > 0) {
                         const nextCache: AppStoreStatusCache = {
                             ...appStoreStatusCacheRef.current,
@@ -200,6 +318,7 @@ export const useAppStoreBanCheck = (input: UseAppStoreBanCheckInput) => {
                         };
                         appStoreStatusCacheRef.current = nextCache;
                         writeAppStoreStatusCache(sessionUserId, nextCache);
+                        await persistStatusToRemote(numericId, 'ok');
                     }
                 } catch {
                     // Unknown - do not show ban status
@@ -218,4 +337,3 @@ export const useAppStoreBanCheck = (input: UseAppStoreBanCheckInput) => {
 
     return { bannedAppIds };
 };
-

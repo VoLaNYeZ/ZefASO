@@ -222,11 +222,55 @@ export const loadAppSettings = async (): Promise<AppSettings> => {
         };
     }
 
+    const normalizeName = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
+    const isValidCategory = (value: string) => value && value !== 'Uncategorized';
+
+    const rawCategories = Array.isArray(data.categories) ? data.categories : [];
+    const cleanedCategories: string[] = [];
+    const seen = new Set<string>();
+
+    rawCategories.forEach((cat) => {
+        const clean = normalizeName(cat);
+        if (!isValidCategory(clean) || seen.has(clean)) return;
+        seen.add(clean);
+        cleanedCategories.push(clean);
+    });
+
+    const rawMap = (data.app_category_map || {}) as Record<string, unknown>;
+    const cleanedMap: Record<string, string> = {};
+    const mapCategories: string[] = [];
+    Object.entries(rawMap).forEach(([app, cat]) => {
+        const cleanCat = normalizeName(cat);
+        if (!isValidCategory(cleanCat)) return;
+        cleanedMap[app] = cleanCat;
+        mapCategories.push(cleanCat);
+    });
+
+    if (mapCategories.length > 0) {
+        const uniqueMissing = Array.from(new Set(mapCategories.filter((cat) => !seen.has(cat))))
+            .sort((a, b) => a.localeCompare(b));
+        uniqueMissing.forEach((cat) => {
+            if (seen.has(cat)) return;
+            seen.add(cat);
+            cleanedCategories.push(cat);
+        });
+    }
+
+    if (cleanedCategories.length === 0) {
+        cleanedCategories.push('General');
+        seen.add('General');
+    }
+
+    const rawCollapsed = Array.isArray(data.collapsed_categories) ? data.collapsed_categories : [];
+    const collapsedCategories = rawCollapsed
+        .map(normalizeName)
+        .filter((cat) => cat && (cat === 'Uncategorized' || seen.has(cat)));
+
     return {
         appIcons: data.app_icons || {},
-        categories: data.categories || ['General'],
-        appCategoryMap: data.app_category_map || {},
-        collapsedCategories: data.collapsed_categories || []
+        categories: cleanedCategories,
+        appCategoryMap: cleanedMap,
+        collapsedCategories
     };
 };
 

@@ -398,35 +398,54 @@ const App = () => {
 
 
 
-    // Save to Supabase whenever data changes (debounced, consolidated)
-    const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+    // Save to Supabase (debounced, separated to avoid stale settings overwrites)
+    const saveDataTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+    const saveSettingsTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+    const savePrefsTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
     useEffect(() => {
         if (!session || dataLoading || loadFailed) return;
-
-        // Clear any pending save
-        clearTimeout(saveTimeoutRef.current);
-
-        // Debounce all saves together
-        saveTimeoutRef.current = setTimeout(async () => {
+        clearTimeout(saveDataTimeoutRef.current);
+        saveDataTimeoutRef.current = setTimeout(async () => {
             try {
-                await Promise.all([
-                    saveAsoData(data),
-                    saveAppSettings({
-                        appIcons,
-                        categories,
-                        appCategoryMap,
-                        collapsedCategories
-                    }),
-                    saveUserPreferences({ lang, theme, hiddenApps })
-                ]);
+                await saveAsoData(data);
             } catch (error) {
                 console.error('Failed to save data:', error);
             }
         }, 1000);
+        return () => clearTimeout(saveDataTimeoutRef.current);
+    }, [data, session, dataLoading, loadFailed]);
 
-        return () => clearTimeout(saveTimeoutRef.current);
-    }, [data, appIcons, categories, appCategoryMap, collapsedCategories, lang, theme, hiddenApps, session, dataLoading, loadFailed]);
+    useEffect(() => {
+        if (!session || dataLoading || loadFailed) return;
+        clearTimeout(saveSettingsTimeoutRef.current);
+        saveSettingsTimeoutRef.current = setTimeout(async () => {
+            try {
+                await saveAppSettings({
+                    appIcons,
+                    categories,
+                    appCategoryMap,
+                    collapsedCategories
+                });
+            } catch (error) {
+                console.error('Failed to save app settings:', error);
+            }
+        }, 1000);
+        return () => clearTimeout(saveSettingsTimeoutRef.current);
+    }, [appIcons, categories, appCategoryMap, collapsedCategories, session, dataLoading, loadFailed]);
+
+    useEffect(() => {
+        if (!session || dataLoading || loadFailed) return;
+        clearTimeout(savePrefsTimeoutRef.current);
+        savePrefsTimeoutRef.current = setTimeout(async () => {
+            try {
+                await saveUserPreferences({ lang, theme, hiddenApps });
+            } catch (error) {
+                console.error('Failed to save user preferences:', error);
+            }
+        }, 1000);
+        return () => clearTimeout(savePrefsTimeoutRef.current);
+    }, [lang, theme, hiddenApps, session, dataLoading, loadFailed]);
 
     // -- Cross-Tab Synchronization --
     const isRemoteUpdate = useRef(false);
@@ -1323,9 +1342,7 @@ const App = () => {
                 rawId = latestEntry.appId;
             }
         }
-        // Extract numbers from strings like "App Name 123456"
-        const match = rawId.match(/(\d+)/);
-        return match ? match[0] : null;
+        return extractNumericId(rawId);
     }, [filters.appId, filters.appName, data]);
 
     // -- Fetch App Icon Effect --
@@ -1419,8 +1436,7 @@ const App = () => {
                         .filter(d => (d.appGroup || d.appName) === appName)
                         .sort((a, b) => b.date.localeCompare(a.date))[0]?.appId;
                 // Resolve numeric ID from string ID if needed
-                const match = appId ? appId.match(/(\d+)/) : null;
-                const numericId = match ? match[0] : null;
+                const numericId = extractNumericId(appId);
 
                 if (!numericId) {
                     console.log(`[IconFetcher] Skipping ${appName} - no numeric ID found.`);
