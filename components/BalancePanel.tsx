@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { BalanceEntry, addBalanceEntry, loadBalanceEntries } from '../lib/supabaseService';
-import { DollarSign, Plus, Minus, Calendar, StickyNote, Loader2 } from 'lucide-react';
+import { DollarSign, Plus, Minus, Calendar, StickyNote, Loader2, ChevronRight, Copy, Check } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 interface BalancePanelProps {
@@ -61,6 +61,12 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
     const pickerPortalRef = useRef<HTMLDivElement | null>(null);
     const [pickerPosition, setPickerPosition] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
     const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+    const balanceTriggerRef = useRef<HTMLButtonElement | null>(null);
+    const [panelPosition, setPanelPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+    const [showWalletModal, setShowWalletModal] = useState(false);
+    const [walletCopied, setWalletCopied] = useState(false);
+    const walletAddress = 'TS2uavPzfMS9vz5eEfWUe4GxKZyn1V2bou';
+    const walletInputRef = useRef<HTMLInputElement | null>(null);
 
     const totals = useMemo(() => {
         const deposits = entries.filter(e => e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
@@ -114,6 +120,15 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
     useEffect(() => {
         if (!balanceRunout) setShowRunoutTip(false);
     }, [balanceRunout]);
+
+    useEffect(() => {
+        if (!showWalletModal) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setShowWalletModal(false);
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [showWalletModal]);
 
     useEffect(() => {
         if (!session) {
@@ -182,6 +197,24 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
         });
     };
 
+    const updatePanelPosition = () => {
+        const rect = balanceTriggerRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const padding = 12;
+        const available = Math.max(0, window.innerWidth - padding * 2);
+        const width = Math.min(200, available);
+        if (!width) return;
+        const rawLeft = rect.right - width;
+        const minLeft = padding;
+        const maxLeft = Math.max(minLeft, window.innerWidth - width - padding);
+        const left = Math.min(Math.max(rawLeft, minLeft), maxLeft);
+        setPanelPosition({
+            top: rect.bottom + 8 + window.scrollY,
+            left: left + window.scrollX,
+            width
+        });
+    };
+
     useLayoutEffect(() => {
         if (!showDatePicker) return;
         updatePickerPosition();
@@ -194,6 +227,19 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
             window.removeEventListener('resize', onResize);
         };
     }, [showDatePicker]);
+
+    useLayoutEffect(() => {
+        if (!expanded) return;
+        updatePanelPosition();
+        const onScroll = () => updatePanelPosition();
+        const onResize = () => updatePanelPosition();
+        window.addEventListener('scroll', onScroll, true);
+        window.addEventListener('resize', onResize);
+        return () => {
+            window.removeEventListener('scroll', onScroll, true);
+            window.removeEventListener('resize', onResize);
+        };
+    }, [expanded]);
 
     const goToMonth = (direction: 'prev' | 'next') => {
         setCalendarMonth(prev => {
@@ -266,11 +312,45 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
         setSaving(false);
     };
 
+    const walletLabels = {
+        footer: lang === 'ru' ? 'QR кошелька' : 'Wallet QR',
+        title: lang === 'ru' ? 'Кошелек для пополнения' : 'Replenishment wallet',
+        address: lang === 'ru' ? 'USDT адрес' : 'USDT wallet',
+        copy: lang === 'ru' ? 'Скопировать' : 'Copy',
+        copied: lang === 'ru' ? 'Скопировано' : 'Copied'
+    };
+
+    const handleCopyWallet = async () => {
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(walletAddress);
+            } else if (walletInputRef.current) {
+                walletInputRef.current.select();
+                document.execCommand?.('copy');
+            }
+            setWalletCopied(true);
+            window.setTimeout(() => setWalletCopied(false), 1600);
+        } catch {
+            setWalletCopied(false);
+        }
+    };
+
     return (
         <div className="relative inline-flex shrink-0 w-fit">
             <button
                 type="button"
-                onClick={() => setExpanded(prev => !prev)}
+                ref={balanceTriggerRef}
+                onClick={() => {
+                    setExpanded(prev => {
+                        const next = !prev;
+                        if (next) {
+                            updatePanelPosition();
+                        } else {
+                            setPanelPosition(null);
+                        }
+                        return next;
+                    });
+                }}
                 className={`flex items-center gap-1.5 rounded-lg bg-slate-850 border border-slate-700 text-slate-100 px-2 py-1.5 shadow-md shadow-black/20 transition-all ${expanded ? 'ring-1 ring-indigo-500/60 bg-slate-800' : ''}`}
             >
                 {(() => {
@@ -334,8 +414,16 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
                 </div>
             )}
 
-            {expanded && (
-                <div className="absolute right-2 top-full mt-2 space-y-2 animate-shelf w-[200px] max-w-[calc(100vw-48px)] z-40">
+            {expanded && panelPosition && createPortal(
+                <div
+                    style={{
+                        position: 'absolute',
+                        top: panelPosition.top,
+                        left: panelPosition.left,
+                        width: panelPosition.width
+                    }}
+                    className="space-y-2 animate-shelf z-[60]"
+                >
                     <div className="rounded-xl border border-slate-800 bg-slate-900/95 shadow-xl overflow-hidden w-full">
                         <div className="p-3 space-y-3">
                             <div className="grid grid-cols-2 gap-2">
@@ -541,8 +629,85 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
                                 </div>
                             ))}
                         </div>
+                        <div className="border-t border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setShowWalletModal(true)}
+                                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-slate-200 hover:text-white hover:bg-slate-800/60 transition-colors"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <DollarSign size={14} className="text-emerald-300" />
+                                    {walletLabels.footer}
+                                </span>
+                                <ChevronRight size={16} className="text-slate-500" />
+                            </button>
+                        </div>
                     </div>
-                </div>
+                </div>,
+                document.body
+            )}
+
+            {showWalletModal && createPortal(
+                <div
+                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                    onClick={() => setShowWalletModal(false)}
+                >
+                    <div
+                        className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="px-5 py-4 border-b border-slate-800">
+                            <p className="text-sm text-slate-400 uppercase tracking-[0.12em]">{walletLabels.footer}</p>
+                            <h3 className="text-lg font-bold text-slate-100 mt-1">{walletLabels.title}</h3>
+                        </div>
+                        <div className="px-5 py-4 space-y-4">
+                            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3 flex items-center justify-center">
+                                <img
+                                    src="/ChineseUSDT.png"
+                                    alt="Wallet QR"
+                                    className="w-48 h-48 object-contain"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <p className="text-xs text-slate-400 font-semibold uppercase tracking-[0.12em]">{walletLabels.address}</p>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        ref={walletInputRef}
+                                        readOnly
+                                        value={walletAddress}
+                                        onClick={(e) => (e.currentTarget as HTMLInputElement).select()}
+                                        className="flex-1 px-3 py-2 rounded-lg bg-slate-800/90 border border-slate-700 text-slate-100 text-xs font-mono tracking-wide"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleCopyWallet}
+                                        className="px-3 py-2 rounded-lg border border-slate-700 text-slate-100 text-xs font-semibold hover:bg-slate-800 transition-colors whitespace-nowrap"
+                                    >
+                                        {walletCopied ? (
+                                            <span className="inline-flex items-center gap-1">
+                                                <Check size={12} /> {walletLabels.copied}
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1">
+                                                <Copy size={12} /> {walletLabels.copy}
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="px-5 py-4 border-t border-slate-800 bg-slate-900/80">
+                            <button
+                                type="button"
+                                onClick={() => setShowWalletModal(false)}
+                                className="w-full px-4 py-2 rounded-lg bg-slate-800 text-slate-200 text-sm font-semibold hover:bg-slate-700 transition-colors"
+                            >
+                                {lang === 'ru' ? 'Закрыть' : 'Close'}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     );
