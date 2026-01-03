@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import DOMPurify from 'dompurify';
 import {
     LayoutDashboard,
@@ -278,6 +278,9 @@ const App = () => {
     const currentUserId = useRef<string | null>(null);
     const hasUserAddedData = useRef(false);
     const hasRunAutoSync = useRef(false);
+    const asoRefreshTtlMs = 12 * 60 * 60 * 1000;
+    const lastAsoRefreshRef = useRef(0);
+    const asoRefreshIdRef = useRef(0);
 
     // Load initial data from Supabase when authenticated
     useEffect(() => {
@@ -287,6 +290,8 @@ const App = () => {
             hasLoadedData.current = false;
             currentUserId.current = null;
             hasUserAddedData.current = false;
+            lastAsoRefreshRef.current = 0;
+            asoRefreshIdRef.current += 1;
             setWarningsSettings(buildDefaultWarningsSettings(['General'], [], { monitorEnabledDefault: false, initialized: false }));
             setCompetitorDetections([]);
             setCompetitorTargets([]);
@@ -381,6 +386,7 @@ const App = () => {
                 }, {});
                 setAppAliases(groupedAliases);
 
+                lastAsoRefreshRef.current = Date.now();
                 hasLoadedData.current = true;
                 currentUserId.current = userId;
             } catch (error) {
@@ -395,6 +401,45 @@ const App = () => {
 
         loadInitialData();
     }, [session]);
+
+    const refreshAsoData = useCallback(async () => {
+        if (!session) return;
+        const refreshId = ++asoRefreshIdRef.current;
+        try {
+            const asoDataRaw = await loadAsoData();
+            if (refreshId !== asoRefreshIdRef.current) return;
+            const testAppNames = new Set(['SecretBen', 'FitnessPro']);
+            const asoData = asoDataRaw.filter(d => !testAppNames.has(d.appName));
+            setData(asoData);
+            lastAsoRefreshRef.current = Date.now();
+        } catch (error) {
+            console.error('Error refreshing ASO data:', error);
+        }
+    }, [session]);
+
+    useEffect(() => {
+        if (!session) return;
+
+        const maybeRefresh = () => {
+            if (dataLoading || isSyncing) return;
+            const now = Date.now();
+            const last = lastAsoRefreshRef.current;
+            if (last && now - last < asoRefreshTtlMs) return;
+            refreshAsoData();
+        };
+
+        const onFocus = () => maybeRefresh();
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') maybeRefresh();
+        };
+
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
+    }, [session, dataLoading, isSyncing, refreshAsoData, asoRefreshTtlMs]);
 
 
 
