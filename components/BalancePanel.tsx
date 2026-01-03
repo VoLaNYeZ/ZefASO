@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { BalanceEntry, addBalanceEntry, loadBalanceEntries } from '../lib/supabaseService';
 import { DollarSign, Plus, Minus, Calendar, StickyNote, Loader2, ChevronRight, Copy, Check } from 'lucide-react';
@@ -43,6 +43,7 @@ const pluralRuDays = (count: number): string => {
 };
 
 export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstallCost, recentInstallSpend7d, recentInstallSpendDates7d, lang = 'en' }) => {
+    const balanceRefreshTtlMs = 5 * 60 * 1000;
     const [expanded, setExpanded] = useState(false);
     const [entries, setEntries] = useState<BalanceEntry[]>([]);
     const [loading, setLoading] = useState(false);
@@ -67,6 +68,8 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
     const [walletCopied, setWalletCopied] = useState(false);
     const walletAddress = 'TS2uavPzfMS9vz5eEfWUe4GxKZyn1V2bou';
     const walletInputRef = useRef<HTMLInputElement | null>(null);
+    const lastBalanceLoadRef = useRef(0);
+    const balanceLoadIdRef = useRef(0);
 
     const totals = useMemo(() => {
         const deposits = entries.filter(e => e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
@@ -130,8 +133,31 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
         return () => document.removeEventListener('keydown', onKeyDown);
     }, [showWalletModal]);
 
+    const refreshBalanceEntries = useCallback(async (opts?: { initial?: boolean }) => {
+        if (!session) return;
+        const initial = !!opts?.initial;
+        const loadId = ++balanceLoadIdRef.current;
+
+        if (initial) setHasLoadedOnce(false);
+        setLoading(true);
+
+        try {
+            const logs = await loadBalanceEntries();
+            if (loadId !== balanceLoadIdRef.current) return;
+            setEntries(logs);
+            lastBalanceLoadRef.current = Date.now();
+        } finally {
+            if (loadId !== balanceLoadIdRef.current) return;
+            setLoading(false);
+            if (initial) setHasLoadedOnce(true);
+        }
+    }, [session]);
+
     useEffect(() => {
         if (!session) {
+            balanceLoadIdRef.current += 1;
+            lastBalanceLoadRef.current = 0;
+            setLoading(false);
             setEntries([]);
             setExpanded(false);
             setShowRunoutTip(false);
@@ -139,27 +165,32 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
             return;
         }
 
-        let cancelled = false;
-        const load = async () => {
-            setLoading(true);
-            setHasLoadedOnce(false);
-            try {
-                const logs = await loadBalanceEntries();
-                if (cancelled) return;
-                setEntries(logs);
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                    setHasLoadedOnce(true);
-                }
-            }
+        refreshBalanceEntries({ initial: true });
+    }, [session, refreshBalanceEntries]);
+
+    useEffect(() => {
+        if (!session) return;
+
+        const maybeRefresh = () => {
+            if (loading) return;
+            const now = Date.now();
+            const last = lastBalanceLoadRef.current;
+            if (last && now - last < balanceRefreshTtlMs) return;
+            refreshBalanceEntries();
         };
 
-        load();
-        return () => {
-            cancelled = true;
+        const onFocus = () => maybeRefresh();
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') maybeRefresh();
         };
-    }, [session]);
+
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
+    }, [session, loading, refreshBalanceEntries, balanceRefreshTtlMs]);
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
