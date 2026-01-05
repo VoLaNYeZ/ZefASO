@@ -459,21 +459,21 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
                         <div className="p-3 space-y-3">
                             <div className="grid grid-cols-2 gap-2">
                                 {[
-                                    { label: 'Deposits', value: formatCurrency(totals.deposits), color: 'emerald' },
-                                    { label: 'Spends', value: `-${formatCurrency(totals.spends)}`, color: 'rose' },
-                                ].map(({ label, value, color }) => {
+                                    { label: 'Deposits', value: formatCurrency(totals.deposits) },
+                                    { label: 'Spends', value: `-${formatCurrency(totals.spends)}` },
+                                ].map(({ label, value }) => {
                                     const len = value.length;
                                     const fontSize = `${Math.max(10, 13 - Math.max(0, len - 8) * 0.6)}px`;
                                     return (
                                         <div
                                             key={label}
-                                            className={`rounded-lg border border-${color}-500/20 bg-${color}-500/8 px-2.5 py-1.5 flex flex-col justify-center overflow-hidden`}
+                                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 flex flex-col justify-center overflow-hidden shadow-sm"
                                         >
-                                            <p className={`text-[10px] uppercase text-${color}-200/80 font-semibold tracking-wide w-full text-${label === 'Deposits' ? 'left' : 'right'}`}>{label}</p>
+                                            <p className={`text-[10px] uppercase text-slate-500 font-semibold tracking-wide w-full ${label === 'Deposits' ? 'text-left' : 'text-right'}`}>{label}</p>
                                             <div className="w-full flex items-center justify-center">
                                                 <div className="flex-1 flex items-center justify-center">
                                                     <p
-                                                        className={`font-black text-${color}-100 tabular-nums leading-tight whitespace-nowrap text-center`}
+                                                        className="font-black text-slate-900 tabular-nums leading-tight whitespace-nowrap text-center"
                                                         style={{ fontSize }}
                                                     >
                                                         {value}
