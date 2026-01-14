@@ -79,12 +79,6 @@ import type { WarningRuleId, WarningRuleSetting, WarningsSettings } from './src/
 import { extractNumericId, useAppStoreBanCheck } from './src/appstore/useAppStoreBanCheck';
 
 const VIEW_MODE_COOKIE = 'zeyf_view_mode';
-const COMPETITOR_TRACKER_ALLOWLIST = new Set(
-    (import.meta.env.VITE_COMPETITOR_TRACKER_ALLOWLIST || '')
-        .split(',')
-        .map(value => value.trim().toLowerCase())
-        .filter(Boolean)
-);
 const TRACK_STOPWORDS = new Set([
     'app',
     'apps',
@@ -614,13 +608,6 @@ const App = () => {
         cancelText?: string;
         resolve: (value: boolean) => void;
     } | null>(null);
-    const canUseCompetitorTracker = useMemo(() => {
-        if (!session?.user) return false;
-        if (COMPETITOR_TRACKER_ALLOWLIST.has('*')) return true;
-        const email = session.user.email?.toLowerCase() || '';
-        return COMPETITOR_TRACKER_ALLOWLIST.has(session.user.id) ||
-            (email ? COMPETITOR_TRACKER_ALLOWLIST.has(email) : false);
-    }, [session]);
 
     const formatAliasLabel = (alias?: AppAlias | null) => {
         if (!alias || (!alias.prefix && !alias.number)) return null;
@@ -2838,7 +2825,6 @@ const App = () => {
                              onDeleteCompetitors={handleDeleteCompetitors}
                              competitorTrackingByApp={competitorTrackingByApp}
                              competitorTrackingByFolder={competitorTrackingByFolder}
-                             competitorTrackerEnabled={canUseCompetitorTracker}
                          />
                      </div>
                  ) : (

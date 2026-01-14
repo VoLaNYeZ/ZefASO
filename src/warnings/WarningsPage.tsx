@@ -36,7 +36,6 @@ interface WarningsPageProps {
   onDeleteCompetitors: (appKey: string) => void;
   competitorTrackingByApp?: Record<string, boolean>;
   competitorTrackingByFolder?: Record<string, boolean>;
-  competitorTrackerEnabled?: boolean;
 }
 
 const stripGeoKeywordPrefix = (message: string, geo: string, keyword: string): string => {
@@ -87,7 +86,6 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
   onDeleteCompetitors,
   competitorTrackingByApp,
   competitorTrackingByFolder,
-  competitorTrackerEnabled,
 }) => {
   const today = formatDate(new Date());
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -392,7 +390,6 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
   const trackingByApp = competitorTrackingByApp || {};
   const trackingByFolder = competitorTrackingByFolder || {};
   const trackingLabel = t.competitorTrackingNow || (lang === 'ru' ? 'Трекинг...' : 'Tracking...');
-  const showCompetitorTracker = typeof competitorTrackerEnabled === 'boolean' ? competitorTrackerEnabled : true;
 
   const competitorPairCountsByApp = useMemo(() => {
     const startDate = addDays(today, -29);
@@ -940,27 +937,25 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
         })}
       </div>
 
-      {showCompetitorTracker && (
-        <>
-          <div className="mt-6 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end">
-            <button
-              onClick={() => setShowCompetitors((prev) => !prev)}
-              className={`inline-flex items-center justify-center rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors ${
-                showCompetitors
-                  ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-200'
-                  : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-              title={t.competitorTracker || 'Competitors'}
-            >
-              {t.competitorTracker || 'Competitors'}
-              {competitorCount > 0 && (
-                <span className="ml-1 text-[10px] font-bold">{competitorCount}</span>
-              )}
-            </button>
-          </div>
+      <div className="mt-6 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end">
+        <button
+          onClick={() => setShowCompetitors((prev) => !prev)}
+          className={`inline-flex items-center justify-center rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors ${
+            showCompetitors
+              ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-200'
+              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
+          }`}
+          title={t.competitorTracker || 'Competitors'}
+        >
+          {t.competitorTracker || 'Competitors'}
+          {competitorCount > 0 && (
+            <span className="ml-1 text-[10px] font-bold">{competitorCount}</span>
+          )}
+        </button>
+      </div>
 
-          {showCompetitors && (
-            <div className="mt-4 space-y-4">
+      {showCompetitors && (
+        <div className="mt-4 space-y-4">
           <div className="flex items-center justify-between px-1">
             <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               {t.competitorTracker || 'Competitor tracker'}
@@ -1387,9 +1382,7 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
               </div>
             );
           })}
-            </div>
-          )}
-        </>
+        </div>
       )}
 
       {settingsAppKey && (
