@@ -77,6 +77,7 @@ import { addDays, formatDate } from './src/warnings/date';
 import { cloneDefaultWarningsRules } from './src/warnings/defaults';
 import type { WarningRuleId, WarningRuleSetting, WarningsSettings } from './src/warnings/types';
 import { extractNumericId, useAppStoreBanCheck } from './src/appstore/useAppStoreBanCheck';
+import { toIsoCountryCode } from './utils/geo';
 
 const VIEW_MODE_COOKIE = 'zeyf_view_mode';
 const TRACK_STOPWORDS = new Set([
@@ -1392,9 +1393,8 @@ const App = () => {
 
             availableGeos.forEach(g => {
                 // Map common codes to ISO
-                const code = g.toUpperCase();
-                if (code === 'UK') countriesToTry.add('GB');
-                else if (code.length === 2) countriesToTry.add(code);
+                const code = toIsoCountryCode(g);
+                if (code.length === 2) countriesToTry.add(code);
             });
 
             // 2. Iterate and try to fetch
@@ -1500,7 +1500,9 @@ const App = () => {
 
                         if (uniqueGeos.length > 0) {
                             const fallbackGeo = uniqueGeos[0]; // Just try the first one
-                            const fallbackUrl = `https://itunes.apple.com/lookup?id=${numericId}&country=${fallbackGeo}`;
+                            const fallbackCountry = toIsoCountryCode(fallbackGeo);
+                            if (fallbackCountry.length !== 2) continue;
+                            const fallbackUrl = `https://itunes.apple.com/lookup?id=${numericId}&country=${fallbackCountry}`;
 
                             const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('itunes-proxy', {
                                 body: { url: fallbackUrl }
@@ -1539,11 +1541,9 @@ const App = () => {
 
 
     const getStoreUrl = (geo: string, id: string) => {
-        // Map custom codes to Apple Store ISO codes
-        const isoMap: Record<string, string> = { 'UK': 'gb', 'EN': 'gb', 'NE': 'nl', 'SW': 'se', 'PO': 'pl' };
-        const key = geo.toUpperCase();
-        const code = (isoMap[key] || key).toLowerCase();
-        return `https://apps.apple.com/${code}/app/id${id}`;
+        const code = toIsoCountryCode(geo);
+        const target = code && code !== 'ALL' ? code.toLowerCase() : geo.toLowerCase();
+        return `https://apps.apple.com/${target}/app/id${id}`;
     };
 
     // -- Filter Data Logic --
@@ -1626,16 +1626,7 @@ const App = () => {
     // -- Helpers --
 
     const getCountryFlag = (geoCode: string) => {
-        const code = geoCode.toUpperCase();
-        // Correct mapping for United Kingdom from non-standard "UK" to ISO "GB"
-        const isoMap: Record<string, string> = {
-            'UK': 'GB',
-            'EN': 'GB',
-            'SW': 'SE', // Sweden
-            'NE': 'NL', // Netherlands (non-standard, should be NL)
-            'PO': 'PL', // Poland
-        };
-        const target = isoMap[code] || code;
+        const target = toIsoCountryCode(geoCode);
 
         if (target === 'ALL') return 'https://flagcdn.com/w20/un.png'; // Use UN flag for World/All
         if (target.length !== 2) return 'https://flagcdn.com/w20/un.png';

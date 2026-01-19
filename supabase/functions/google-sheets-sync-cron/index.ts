@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
+import { normalizeGeoInput } from "../_shared/geo.ts";
 
 const DEFAULT_CPI = 0.09;
 const ALL_TABS_SENTINEL = "__ZEYFASO_ALL_TABS__";
@@ -151,43 +152,6 @@ const parseDate = (dateStr: string): string | null => {
   return null;
 };
 
-const normalizeGeoCode = (geo: string): string => {
-  const trimmed = (geo ?? "").trim();
-  const upper = trimmed.toUpperCase();
-
-  const countryMap: Record<string, string> = {
-    "UNITED STATES": "US",
-    "USA": "US",
-    "UNITED KINGDOM": "GB",
-    "UK": "GB",
-    "NETHERLANDS": "NL",
-    "GERMANY": "DE",
-    "FRANCE": "FR",
-    "ITALY": "IT",
-    "SPAIN": "ES",
-    "SWEDEN": "SE",
-    "SWITZERLAND": "CH",
-    "CANADA": "CA",
-    "AUSTRALIA": "AU",
-    "AUSTRIA": "AT",
-    "JAPAN": "JP",
-    "CHINA": "CN",
-    "BRAZIL": "BR",
-    "INDIA": "IN",
-    "RUSSIA": "RU",
-    "SOUTH KOREA": "KR",
-    "POLAND": "PL",
-    "PO": "PL",
-    "AUS": "AU",
-    "AUT": "AT",
-    "POL": "PL",
-  };
-
-  if (countryMap[upper]) return countryMap[upper];
-  if (upper.length === 2) return upper;
-  return upper.substring(0, 2);
-};
-
 const parseNumeric = (raw: string): number | null => {
   const cleaned = (raw ?? "").replace(/[^\d-]/g, "");
   if (!cleaned) return null;
@@ -218,7 +182,7 @@ const processSheetDataToDb = (
     const dateRaw = String(row[0] ?? "");
     const appGroup = tabName;
     const appName = String(row[1] ?? tabName).trim();
-    const geo = normalizeGeoCode(String(row[2] ?? ""));
+  const geo = normalizeGeoInput(String(row[2] ?? ""));
     const appIdRaw = String(row[3] ?? "").trim();
     const keyword = String(row[4] ?? "").trim();
     const rankingRaw = String(row[6] ?? "").trim();

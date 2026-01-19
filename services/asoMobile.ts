@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { toIsoCountryCode } from '../utils/geo';
 
 export interface TrafficData {
     traffic: {
@@ -21,14 +22,7 @@ export interface TrafficData {
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const fetchTrafficData = async (keyword: string, geo: string): Promise<TrafficData> => {
-    // Map non-standard country codes to ISO 3166-1 alpha-2
-    const countryMap: Record<string, string> = {
-        'UK': 'GB',
-        'SW': 'SE',
-        'EN': 'US',
-    };
-    const upperGeo = geo.toUpperCase();
-    const mappedGeo = countryMap[upperGeo] || upperGeo;
+    const mappedGeo = toIsoCountryCode(geo);
 
     // 1. Create Ticket via Edge Function
     // Note: The API requires platform and ios_device. Assuming IOS/IPHONE for now as this seems to be an iOS ASO tool.

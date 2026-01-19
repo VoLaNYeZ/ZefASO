@@ -6,6 +6,7 @@ import { fetchTrafficData, TrafficData } from '../services/asoMobile';
 import { TrafficTooltip } from './TrafficTooltip';
 import { ConfirmationPopover } from './ConfirmationPopover';
 import Top5Modal from './Top5Modal';
+import { toIsoCountryCode } from '../utils/geo';
 
 interface RealtimeStandingsProps {
     appId: string;
@@ -66,16 +67,8 @@ export const RealtimeStandings: React.FC<RealtimeStandingsProps> = ({
         return () => clearInterval(timer);
     }, [appId]);
 
-    // Map common country code variations to standard ISO codes
     const normalizeCountryCode = (geo: string): string => {
-        const mapping: Record<string, string> = {
-            'UK': 'GB',  // United Kingdom
-            'SW': 'SE',  // Sweden
-            'NE': 'NL',  // Netherlands
-            'NO': 'NO',  // Norway (already standard)
-            'PO': 'PL',  // Poland fix
-        };
-        return mapping[geo.toUpperCase()] || geo.toUpperCase();
+        return toIsoCountryCode(geo) || geo.toUpperCase();
     };
 
     const loadCountryRankings = async () => {

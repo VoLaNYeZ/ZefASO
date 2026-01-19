@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { AsoEntry, Translations } from '../types';
 import { DEFAULT_CPI } from '../constants';
 import { ALL_TABS_SENTINEL, buildStoredTabsAllExcept, resolveTabsToSync } from '../utils/googleSheetsSync';
+import { normalizeGeoInput } from '../utils/geo';
 
 interface DataUploadModalProps {
     isOpen: boolean;
@@ -193,85 +194,6 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
         return null;
     };
 
-    // Normalize country names to ISO codes
-    const normalizeGeoCode = (geo: string): string => {
-        const trimmed = geo.trim();
-
-        // Common country name mappings
-        const countryMap: Record<string, string> = {
-            // Full names to codes
-            'Australia': 'AU', 'australia': 'AU',
-            'Finland': 'FI', 'finland': 'FI',
-            'Austria': 'AT', 'austria': 'AT',
-            'Netherlands': 'NL', 'netherlands': 'NL',
-            'Portugal': 'PT', 'portugal': 'PT',
-            'Sweden': 'SE', 'sweden': 'SE',
-            'United States': 'US', 'united states': 'US',
-            'United Kingdom': 'GB', 'united kingdom': 'GB', 'UK': 'GB', 'uk': 'GB',
-            'Germany': 'DE', 'germany': 'DE',
-            'France': 'FR', 'france': 'FR',
-            'Spain': 'ES', 'spain': 'ES',
-            'Italy': 'IT', 'italy': 'IT',
-            'Canada': 'CA', 'canada': 'CA',
-            'Japan': 'JP', 'japan': 'JP',
-            'China': 'CN', 'china': 'CN',
-            'Brazil': 'BR', 'brazil': 'BR',
-            'India': 'IN', 'india': 'IN',
-            'Mexico': 'MX', 'mexico': 'MX',
-            'South Korea': 'KR', 'south korea': 'KR',
-            'Russia': 'RU', 'russia': 'RU',
-            'Turkey': 'TR', 'turkey': 'TR',
-            'Poland': 'PL', 'poland': 'PL',
-            'Belgium': 'BE', 'belgium': 'BE',
-            'Denmark': 'DK', 'denmark': 'DK',
-            'Norway': 'NO', 'norway': 'NO',
-            'Switzerland': 'CH', 'switzerland': 'CH',
-            'Ireland': 'IE', 'ireland': 'IE',
-            'New Zealand': 'NZ', 'new zealand': 'NZ',
-            'Singapore': 'SG', 'singapore': 'SG',
-            'Hong Kong': 'HK', 'hong kong': 'HK',
-            'South Africa': 'ZA', 'south africa': 'ZA',
-            'Argentina': 'AR', 'argentina': 'AR',
-            'Chile': 'CL', 'chile': 'CL',
-            'Colombia': 'CO', 'colombia': 'CO',
-            'Peru': 'PE', 'peru': 'PE',
-            'Thailand': 'TH', 'thailand': 'TH',
-            'Vietnam': 'VN', 'vietnam': 'VN',
-            'Philippines': 'PH', 'philippines': 'PH',
-            'Indonesia': 'ID', 'indonesia': 'ID',
-            'Malaysia': 'MY', 'malaysia': 'MY',
-            'Taiwan': 'TW', 'taiwan': 'TW',
-            'Greece': 'GR', 'greece': 'GR',
-            'Czech Republic': 'CZ', 'czech republic': 'CZ',
-            'Romania': 'RO', 'romania': 'RO',
-            'Hungary': 'HU', 'hungary': 'HU',
-            'Slovakia': 'SK', 'slovakia': 'SK',
-            'Croatia': 'HR', 'croatia': 'HR',
-            'Israel': 'IL', 'israel': 'IL',
-            'UAE': 'AE', 'uae': 'AE', 'United Arab Emirates': 'AE',
-            'Saudi Arabia': 'SA', 'saudi arabia': 'SA',
-            'Egypt': 'EG', 'egypt': 'EG',
-            'Ukraine': 'UA', 'ukraine': 'UA',
-        };
-
-        // Check if it's a full name that needs conversion
-        if (countryMap[trimmed]) {
-            return countryMap[trimmed];
-        }
-
-        // If it's already a code (2-3 letters), normalize known 3-letter codes too
-        if (trimmed.length <= 3) {
-            const upper = trimmed.toUpperCase();
-            if (upper === 'AUS') return 'AU';
-            if (upper === 'AUT') return 'AT';
-            if (upper === 'POL') return 'PL';
-            return upper;
-        }
-
-        // If no mapping found, return as-is but log it
-        console.warn(`Unknown country name: "${trimmed}" - using as-is`);
-        return trimmed;
-    };
     const parseLine = (line: string): string[] => {
         const hasTab = line.includes('\t');
         const hasComma = line.includes(',');
@@ -388,7 +310,7 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
                         date: date,
                         appName: sidebarAppName,
                         appGroup: sidebarAppName,
-                        geo: normalizeGeoCode(cols[2]) || 'Unknown',
+                        geo: normalizeGeoInput(cols[2]) || 'Unknown',
                         appId: compositeId,
                         keyword: cols[4].trim() || 'None',
                         ranking: ranking, // 0 means unranked/no data
@@ -440,12 +362,13 @@ export const DataUploadModal: React.FC<DataUploadModalProps> = ({ isOpen, onClos
         }
 
         const appNameTrimmed = appName.trim();
+        const normalizedGeo = normalizeGeoInput(manualFormData.geo);
         const newEntry: AsoEntry = {
-            id: `${appNameTrimmed}-${manualFormData.geo}-${Date.now()}`,
+            id: `${appNameTrimmed}-${normalizedGeo}-${Date.now()}`,
             date: manualFormData.date,
             appName: appNameTrimmed,
             appGroup: appNameTrimmed,
-            geo: manualFormData.geo.trim(),
+            geo: normalizedGeo,
             appId: `${appNameTrimmed} ${manualFormData.appId}`,
             keyword: manualFormData.keyword.trim(),
             ranking: parseInt(manualFormData.ranking) || 0,

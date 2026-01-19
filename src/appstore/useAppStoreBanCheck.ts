@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { toIsoCountryCode } from '../../utils/geo';
 
 const APPSTORE_STATUS_CACHE_PREFIX = 'zeyfaso_appstore_status_v1';
 const LEGACY_BANNED_APPIDS_CACHE_PREFIX = 'zeyfaso_banned_appids_v1';
@@ -23,24 +24,10 @@ export const extractNumericId = (raw: unknown): string | null => {
 
 const normalizeItunesCountryCode = (geo: unknown): string | null => {
     if (typeof geo !== 'string') return null;
-    const code = geo.trim().toUpperCase();
-    if (!code) return null;
-
-    const isoMap: Record<string, string> = {
-        'UK': 'GB',
-        'EN': 'GB',
-        'SW': 'SE',
-        'PO': 'PL',
-        'UAE': 'AE',
-        'DUBAI': 'AE',
-        'BALI': 'ID',
-        'INDONESIA': 'ID',
-        'CANADA': 'CA',
-    };
-
-    const out = isoMap[code] || code;
-    if (!/^[A-Z]{2}$/.test(out)) return null;
-    return out;
+    const code = toIsoCountryCode(geo);
+    if (!code || code === 'ALL') return null;
+    if (!/^[A-Z]{2}$/.test(code)) return null;
+    return code;
 };
 
 const getAppStoreStatusStorageKey = (userId: string) => `${APPSTORE_STATUS_CACHE_PREFIX}_${userId}`;

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
 import { CONFUSABLE_ASCII_CODEPOINTS } from "./confusables_ascii.ts";
+import { normalizeGeoInput, toIsoCountryCode } from "../_shared/geo.ts";
 
 const ALLOWED_ORIGINS = [
   "https://zefaso.tech",
@@ -546,23 +547,13 @@ const scoreNames = (
   return { score: bestScore, signals: bestSignals };
 };
 
-const normalizeGeo = (geo: string): string => {
-  const trimmed = (geo || "").trim();
-  const upper = trimmed.toUpperCase();
-  const map: Record<string, string> = {
-    UK: "GB",
-    SW: "SE",
-    EN: "US",
-  };
-  return map[upper] || upper;
-};
-
 const fetchItunes = async (
   keyword: string,
   geo: string,
   limit: number,
 ): Promise<ItunesApp[]> => {
-  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(keyword)}&country=${encodeURIComponent(geo)}&entity=software&limit=${limit}`;
+  const country = toIsoCountryCode(geo);
+  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(keyword)}&country=${encodeURIComponent(country)}&entity=software&limit=${limit}`;
   let attempt = 0;
   while (true) {
     attempt++;
@@ -614,7 +605,7 @@ const parseKeywordGeoPair = (raw: string): { keyword: string; geo: string } | nu
   const geoRaw = parts.pop() || "";
   const keywordRaw = parts.join("::");
   const keyword = keywordRaw.trim();
-  const geo = normalizeGeo(geoRaw.trim());
+  const geo = normalizeGeoInput(geoRaw.trim());
   if (!keyword || !geo) return null;
   return { keyword, geo };
 };
@@ -633,7 +624,7 @@ const normalizeKeywordGeoPairs = (
     if (item && typeof item === "object") {
       const keyword = typeof (item as any).keyword === "string" ? (item as any).keyword.trim() : "";
       const geoRaw = typeof (item as any).geo === "string" ? (item as any).geo.trim() : "";
-      const geo = normalizeGeo(geoRaw);
+      const geo = normalizeGeoInput(geoRaw);
       if (keyword && geo) out.push({ keyword, geo });
     }
   });
@@ -655,7 +646,7 @@ const prepareTargets = (
 
     const keywordGeoPairs = normalizeKeywordGeoPairs(app.keywordGeoPairs);
     const keywords = Array.from(new Set((app.keywords || []).map((k) => (k || "").trim()).filter(Boolean)));
-    const geos = Array.from(new Set((app.geos || []).map((g) => normalizeGeo(g)).filter(Boolean)));
+    const geos = Array.from(new Set((app.geos || []).map((g) => normalizeGeoInput(g)).filter(Boolean)));
 
     const pairs = keywordGeoPairs.length > 0
       ? keywordGeoPairs

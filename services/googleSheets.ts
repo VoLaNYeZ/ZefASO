@@ -1,5 +1,6 @@
 import { AsoEntry } from '../types';
 import { DEFAULT_CPI } from '../constants';
+import { normalizeGeoInput } from '../utils/geo';
 
 // Issue 1.3 FIX: Validate that URL is a legitimate Google Apps Script URL
 const validateGoogleScriptUrl = (url: string): void => {
@@ -79,34 +80,6 @@ const parseDate = (dateStr: string): string | null => {
 };
 
 // Normalize country names to ISO codes
-const normalizeGeoCode = (geo: string): string => {
-    const trimmed = geo.trim();
-    const upper = trimmed.toUpperCase();
-
-    // Explicit map for common names and 3-letter codes
-    const countryMap: Record<string, string> = {
-        // Full names / variants
-        'UNITED STATES': 'US', 'USA': 'US',
-        'UNITED KINGDOM': 'GB', 'UK': 'GB',
-        'NETHERLANDS': 'NL',
-        'GERMANY': 'DE', 'FRANCE': 'FR', 'ITALY': 'IT', 'SPAIN': 'ES',
-        'SWEDEN': 'SE',
-        'SWITZERLAND': 'CH',
-        'CANADA': 'CA', 'AUSTRALIA': 'AU', 'AUSTRIA': 'AT', 'JAPAN': 'JP', 'CHINA': 'CN',
-        'BRAZIL': 'BR', 'INDIA': 'IN', 'RUSSIA': 'RU', 'SOUTH KOREA': 'KR', 'POLAND': 'PL', 'PO': 'PL',
-        // 3-letter codes that sometimes appear
-        'AUS': 'AU', 'AUT': 'AT', 'POL': 'PL'
-    };
-
-    if (countryMap[upper]) return countryMap[upper];
-
-    // If already 2-letter, just upper-case it
-    if (upper.length === 2) return upper;
-
-    // Fallback: first two letters uppercased
-    return upper.substring(0, 2);
-};
-
 // Safely parse a number out of a cell (handles stray chars, commas, apostrophes)
 const parseNumeric = (raw: string): number | null => {
     const cleaned = raw.replace(/[^\d-]/g, '');
@@ -191,7 +164,7 @@ export const processSheetData = (rows: any[][], tabName: string): AsoEntry[] => 
         const dateRaw = String(row[0]);
         const appGroup = tabName;
         const appName = String(row[1] ?? tabName).trim();
-        const geo = normalizeGeoCode(String(row[2]));
+        const geo = normalizeGeoInput(String(row[2]));
         const csvIdRaw = String(row[3]).trim();
         const keyword = String(row[4]).trim();
         const rankingRaw = String(row[6]).trim();

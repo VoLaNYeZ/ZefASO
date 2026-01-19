@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { withRetry } from '../utils/retry';
+import { toIsoCountryCode } from '../utils/geo';
 
 // Queue system to respect iTunes API rate limits (approx 20 req/min)
 // We'll use a 3-second delay between requests to be safe.
@@ -81,15 +82,7 @@ class RequestQueue {
     }
 
     private async fetchRankFromApi(term: string, country: string, rawAppId: string): Promise<number | null> {
-        // Map non-standard country codes to ISO 3166-1 alpha-2
-        const countryMap: Record<string, string> = {
-            'UK': 'GB',
-            'SW': 'SE', // Common mistake: Sweden is SE, not SW
-            'EN': 'US', // Default EN to US
-        };
-
-        const upperCountry = country.toUpperCase();
-        const itunesCountry = countryMap[upperCountry] || upperCountry;
+        const itunesCountry = toIsoCountryCode(country);
 
         // Sanitize App ID: It might be "AppName AppID" or just "AppID"
         // We take the last part after splitting by space to get the ID/BundleID
@@ -148,15 +141,7 @@ export interface Top5App {
 }
 
 export const fetchTop5Apps = async (term: string, country: string): Promise<Top5App[]> => {
-    // Map non-standard country codes to ISO 3166-1 alpha-2
-    const countryMap: Record<string, string> = {
-        'UK': 'GB',
-        'SW': 'SE', // Common mistake: Sweden is SE, not SW
-        'EN': 'US', // Default EN to US
-    };
-
-    const upperCountry = country.toUpperCase();
-    const itunesCountry = countryMap[upperCountry] || upperCountry;
+    const itunesCountry = toIsoCountryCode(country);
 
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=${itunesCountry}&entity=software&limit=200`;
 
