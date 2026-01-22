@@ -14,6 +14,7 @@ const GEO_ALIASES: Record<string, string> = {
   BALI: "ID",
 
   // Full names / variants
+  ARGENTINA: "AR",
   "UNITED STATES": "US",
   USA: "US",
   "UNITED KINGDOM": "GB",
