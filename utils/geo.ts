@@ -20,6 +20,7 @@ const GEO_ALIASES: Record<string, string> = {
     'UNITED ARAB EMIRATES': 'AE',
     AUSTRALIA: 'AU',
     AUSTRIA: 'AT',
+    ARGENTINA: 'AR',
     BELGIUM: 'BE',
     BRAZIL: 'BR',
     CANADA: 'CA',
