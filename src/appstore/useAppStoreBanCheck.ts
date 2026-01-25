@@ -4,7 +4,7 @@ import { toIsoCountryCode } from '../../utils/geo';
 
 const APPSTORE_STATUS_CACHE_PREFIX = 'zeyfaso_appstore_status_v1';
 const LEGACY_BANNED_APPIDS_CACHE_PREFIX = 'zeyfaso_banned_appids_v1';
-const APPSTORE_OK_TTL_MS = 1000 * 60 * 60 * 24; // 24h
+const APPSTORE_OK_TTL_MS = 1000 * 60 * 60 * 6; // 6h
 
 type AppStoreStatusCacheEntry = { status: 'banned' | 'ok'; checkedAt?: number };
 type AppStoreStatusCache = Record<string, AppStoreStatusCacheEntry>;
