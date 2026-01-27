@@ -392,12 +392,10 @@ export const WarningsPage: React.FC<WarningsPageProps> = ({
   const trackingLabel = t.competitorTrackingNow || (lang === 'ru' ? 'Трекинг...' : 'Tracking...');
 
   const competitorPairCountsByApp = useMemo(() => {
-    const startDate = addDays(today, -29);
     const map: Record<string, Set<string>> = {};
     rows.forEach((row) => {
       const appKey = (row?.appGroup || row?.appName || '').trim();
       if (!appKey) return;
-      if (!row.date || row.date < startDate || row.date > today) return;
       const keyword = (row.keyword || '').trim();
       const geo = (row.geo || '').trim();
       if (!keyword || !geo) return;

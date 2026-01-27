@@ -675,15 +675,18 @@ const App = () => {
     };
 
     const computeKeywordGeoPairs = (appKey: string, maxPairs?: number) => {
-        const today = formatDate(new Date());
-        const startDate = addDays(today, -29);
         const pairsMap = new Map<string, { keyword: string; geo: string; installs: number }>();
         const appIdInstalls = new Map<string, number>();
+        let rangeStart = '';
+        let rangeEnd = '';
 
         data.forEach((row) => {
             const group = (row.appGroup || row.appName || '').trim();
             if (!group || group !== appKey) return;
-            if (!row.date || row.date < startDate || row.date > today) return;
+            if (row.date) {
+                if (!rangeStart || row.date < rangeStart) rangeStart = row.date;
+                if (!rangeEnd || row.date > rangeEnd) rangeEnd = row.date;
+            }
 
             const keyword = (row.keyword || '').trim();
             const geo = (row.geo || '').trim();
@@ -713,7 +716,7 @@ const App = () => {
         const topAppId = Array.from(appIdInstalls.entries())
             .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 
-        return { pairs, topAppId, startDate, today };
+        return { pairs, topAppId, rangeStart, rangeEnd };
     };
 
     const setTrackingByApp = (appKey: string, isTracking: boolean) => {
@@ -923,11 +926,12 @@ const App = () => {
             if (!confirmed) return;
         }
 
-        const { pairs, topAppId, startDate, today } = computeKeywordGeoPairs(appKey, maxPairs);
+        const { pairs, topAppId, rangeStart, rangeEnd } = computeKeywordGeoPairs(appKey, maxPairs);
         if (pairs.length === 0) {
+            const rangeLabel = rangeStart && rangeEnd ? `${rangeStart} - ${rangeEnd}` : '';
             const msg = lang === 'ru'
-                ? `Нет данных за ${startDate} — ${today}`
-                : `No data for ${startDate} — ${today}`;
+                ? (rangeLabel ? `Нет данных по ключам/гео за ${rangeLabel}` : 'Нет данных по ключам/гео для этого приложения')
+                : (rangeLabel ? `No keyword/geo data for ${rangeLabel}` : 'No keyword/geo data for this app');
             alert(msg);
             return;
         }
@@ -1011,13 +1015,13 @@ const App = () => {
         const upserts: Promise<void>[] = [];
         const missingApps: string[] = [];
         let totalPairs = 0;
-        let startDate = '';
-        let today = '';
+        let rangeStart = '';
+        let rangeEnd = '';
 
         appKeys.forEach((appKey) => {
             const result = computeKeywordGeoPairs(appKey, maxPairs);
-            startDate = result.startDate;
-            today = result.today;
+            rangeStart = result.rangeStart || rangeStart;
+            rangeEnd = result.rangeEnd || rangeEnd;
             if (result.pairs.length === 0) {
                 missingApps.push(appKey);
                 return;
@@ -1049,9 +1053,10 @@ const App = () => {
         });
 
         if (payloadApps.length === 0) {
+            const rangeLabel = rangeStart && rangeEnd ? `${rangeStart} - ${rangeEnd}` : '';
             const msg = lang === 'ru'
-                ? `Нет данных за ${startDate} - ${today}`
-                : `No data for ${startDate} - ${today}`;
+                ? (rangeLabel ? `Нет данных по ключам/гео за ${rangeLabel}` : 'Нет данных по ключам/гео для этих приложений')
+                : (rangeLabel ? `No keyword/geo data for ${rangeLabel}` : 'No keyword/geo data for these apps');
             alert(msg);
             return;
         }
