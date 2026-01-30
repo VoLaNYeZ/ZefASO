@@ -197,6 +197,67 @@ interface AppSettings {
     collapsedCategories: string[];
 }
 
+export type AppFolderMap = Record<string, string>;
+
+export const loadAppFolderMap = async (): Promise<AppFolderMap> => {
+    const userId = await getUserId();
+    const { data, error } = await supabase
+        .from('app_folder_map')
+        .select('app_key, folder')
+        .eq('user_id', userId);
+
+    if (error) {
+        console.error('Error loading app folder map:', error);
+        return {};
+    }
+
+    const out: AppFolderMap = {};
+    (data || []).forEach((row: any) => {
+        const appKey = typeof row?.app_key === 'string' ? row.app_key : '';
+        const folder = typeof row?.folder === 'string' ? row.folder : '';
+        if (!appKey || !folder) return;
+        out[appKey] = folder;
+    });
+    return out;
+};
+
+export const upsertAppFolderMapEntries = async (entries: Array<{ appKey: string; folder: string }>): Promise<void> => {
+    if (!entries || entries.length === 0) return;
+    const userId = await getUserId();
+    const payload = entries
+        .map(entry => ({
+            user_id: userId,
+            app_key: entry.appKey,
+            folder: entry.folder,
+            updated_at: new Date().toISOString()
+        }))
+        .filter(entry => entry.app_key && entry.folder);
+
+    if (payload.length === 0) return;
+
+    const { error } = await supabase
+        .from('app_folder_map')
+        .upsert(payload, { onConflict: 'user_id,app_key' });
+
+    if (error) {
+        console.error('Error upserting app folder map:', error);
+    }
+};
+
+export const deleteAppFolderMapEntries = async (appKeys: string[]): Promise<void> => {
+    if (!appKeys || appKeys.length === 0) return;
+    const userId = await getUserId();
+    const { error } = await supabase
+        .from('app_folder_map')
+        .delete()
+        .eq('user_id', userId)
+        .in('app_key', appKeys);
+
+    if (error) {
+        console.error('Error deleting app folder map entries:', error);
+    }
+};
+
 export const loadAppSettings = async (): Promise<AppSettings> => {
     const userId = await getUserId();
     const { data, error } = await supabase

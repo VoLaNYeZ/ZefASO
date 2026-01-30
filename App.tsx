@@ -66,7 +66,7 @@ import { KeywordSuggester } from './components/KeywordSuggester';
 import { supabase } from './lib/supabase';
 import { LoginPage } from './components/LoginPage';
 import { Session } from '@supabase/supabase-js';
-import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, loadAppAliases, saveAppAliasesForApp, deleteAsoEntriesForAppGroup, loadWarningsSettings, loadCompetitorDetections, setCompetitorDetectionIgnored, loadCompetitorTargets, upsertCompetitorTarget, setCompetitorTargetActive, setCompetitorTargetsActive, deleteCompetitorDetectionsForApp } from './lib/supabaseService';
+import { loadAsoData, saveAsoData, loadAppSettings, saveAppSettings, loadUserPreferences, saveUserPreferences, checkGoogleSheetsSyncExists, checkIsExistingUser, loadAppAliases, saveAppAliasesForApp, deleteAsoEntriesForAppGroup, loadWarningsSettings, loadCompetitorDetections, setCompetitorDetectionIgnored, loadCompetitorTargets, upsertCompetitorTarget, setCompetitorTargetActive, setCompetitorTargetsActive, deleteCompetitorDetectionsForApp, loadAppFolderMap, upsertAppFolderMapEntries, deleteAppFolderMapEntries } from './lib/supabaseService';
 import { fetchSheetData, fetchSheetTabs, processSheetData } from './services/googleSheets';
 import { ALL_TABS_SENTINEL, buildStoredTabsAllExcept, resolveTabsToSync } from './utils/googleSheetsSync';
 import { BalancePanel } from './components/BalancePanel';
@@ -303,7 +303,7 @@ const App = () => {
         const loadInitialData = async () => {
             setDataLoading(true);
             try {
-                const [asoDataRaw, appSettings, userPrefs, hasSyncConfig, isExistingUser, syncResult, aliases, savedWarningsSettings, loadedCompetitors, loadedCompetitorTargets] = await Promise.all([
+                const [asoDataRaw, appSettings, userPrefs, hasSyncConfig, isExistingUser, syncResult, aliases, savedWarningsSettings, loadedCompetitors, loadedCompetitorTargets, folderMap] = await Promise.all([
                     loadAsoData(),
                     loadAppSettings(),
                     loadUserPreferences(),
@@ -313,7 +313,8 @@ const App = () => {
                     loadAppAliases(),
                     loadWarningsSettings(),
                     loadCompetitorDetections(),
-                    loadCompetitorTargets()
+                    loadCompetitorTargets(),
+                    loadAppFolderMap()
                 ]);
 
                 const testAppNames = new Set(['SecretBen', 'FitnessPro']);
@@ -368,7 +369,11 @@ const App = () => {
 
                 setAppIcons(appSettings.appIcons);
                 setCategories(appSettings.categories);
-                setAppCategoryMap(appSettings.appCategoryMap);
+                const resolvedFolderMap = {
+                    ...(appSettings.appCategoryMap || {}),
+                    ...(folderMap || {})
+                };
+                setAppCategoryMap(resolvedFolderMap);
                 setCollapsedCategories(appSettings.collapsedCategories);
                 setHiddenApps(userPrefs.hiddenApps);
                 setLang(userPrefs.lang);
@@ -382,6 +387,18 @@ const App = () => {
                 setAppAliases(groupedAliases);
 
                 lastAsoRefreshRef.current = Date.now();
+                if (appSettings.appCategoryMap && Object.keys(appSettings.appCategoryMap).length > 0) {
+                    const existing = folderMap || {};
+                    const entries = Object.entries(appSettings.appCategoryMap)
+                        .filter(([appKey, folder]) => appKey && folder && !existing[appKey])
+                        .map(([appKey, folder]) => ({ appKey, folder }));
+                    if (entries.length > 0) {
+                        upsertAppFolderMapEntries(entries).catch((error) => {
+                            console.warn('Failed to backfill app folder map:', error);
+                        });
+                    }
+                }
+
                 hasLoadedData.current = true;
                 currentUserId.current = userId;
             } catch (error) {
@@ -527,6 +544,47 @@ const App = () => {
             broadcastChannel.current?.close();
         };
     }, []); // Empty deps - only run once
+
+    // Realtime sync for per-app folder map
+    useEffect(() => {
+        if (!sessionUserId) return;
+        const channel = supabase.channel(`app_folder_map:${sessionUserId}`);
+
+        channel.on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'app_folder_map',
+            filter: `user_id=eq.${sessionUserId}`
+        }, (payload) => {
+            const next = payload.new as any;
+            const old = payload.old as any;
+            if (payload.eventType === 'DELETE') {
+                const appKey = typeof old?.app_key === 'string' ? old.app_key : '';
+                if (!appKey) return;
+                setAppCategoryMap((prev) => {
+                    if (!prev?.[appKey]) return prev;
+                    const updated = { ...prev };
+                    delete updated[appKey];
+                    return updated;
+                });
+                return;
+            }
+
+            const appKey = typeof next?.app_key === 'string' ? next.app_key : '';
+            const folder = typeof next?.folder === 'string' ? next.folder : '';
+            if (!appKey || !folder) return;
+            setAppCategoryMap((prev) => {
+                if (prev?.[appKey] === folder) return prev;
+                return { ...prev, [appKey]: folder };
+            });
+        });
+
+        channel.subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [supabase, sessionUserId]);
 
     // Broadcast local changes to other tabs
     useEffect(() => {
@@ -1952,6 +2010,9 @@ const App = () => {
         const newCatMap = { ...appCategoryMap };
         delete newCatMap[appName];
         setAppCategoryMap(newCatMap);
+        deleteAppFolderMapEntries([appName]).catch((error) => {
+            console.warn('Failed to delete folder map entry:', error);
+        });
 
         // Switch filter to another app if possible
         const remainingApps = Array.from(new Set(newData.map(d => d.appGroup || d.appName)));
@@ -2011,6 +2072,9 @@ const App = () => {
         const newCatMap = { ...appCategoryMap };
         delete newCatMap[appNameToDelete];
         setAppCategoryMap(newCatMap);
+        deleteAppFolderMapEntries([appNameToDelete]).catch((error) => {
+            console.warn('Failed to delete folder map entry:', error);
+        });
 
         // Remove from hidden apps
         setHiddenApps(prev => prev.filter(app => app !== appNameToDelete));
@@ -2154,34 +2218,62 @@ const App = () => {
             setCategories(prev => prev.map(c => c === targetName ? cleanValue : c));
             // Update mappings
             const newMap = { ...appCategoryMap };
+            const folderUpdates: Array<{ appKey: string; folder: string }> = [];
             Object.keys(newMap).forEach(app => {
                 if (newMap[app] === targetName) {
                     newMap[app] = cleanValue;
+                    folderUpdates.push({ appKey: app, folder: cleanValue });
                 }
             });
             setAppCategoryMap(newMap);
+            if (folderUpdates.length > 0) {
+                upsertAppFolderMapEntries(folderUpdates).catch((error) => {
+                    console.warn('Failed to rename folder map entries:', error);
+                });
+            }
         }
 
         if (mode === 'delete') {
             setCategories(prev => prev.filter(c => c !== targetName));
             // Move apps to uncategorized
             const newMap = { ...appCategoryMap };
+            const deletedApps: string[] = [];
             Object.keys(newMap).forEach(app => {
                 if (newMap[app] === targetName) {
                     delete newMap[app];
+                    deletedApps.push(app);
                 }
             });
             setAppCategoryMap(newMap);
+            if (deletedApps.length > 0) {
+                deleteAppFolderMapEntries(deletedApps).catch((error) => {
+                    console.warn('Failed to delete folder map entries:', error);
+                });
+            }
         }
 
         setCategoryModal(prev => ({ ...prev, isOpen: false }));
     };
 
     const handleMoveApp = (app: string, category: string) => {
-        setAppCategoryMap(prev => ({
-            ...prev,
-            [app]: category
-        }));
+        setAppCategoryMap(prev => {
+            const next = { ...prev };
+            if (category) {
+                next[app] = category;
+            } else {
+                delete next[app];
+            }
+            return next;
+        });
+        if (category) {
+            upsertAppFolderMapEntries([{ appKey: app, folder: category }]).catch((error) => {
+                console.warn('Failed to update folder map entry:', error);
+            });
+        } else {
+            deleteAppFolderMapEntries([app]).catch((error) => {
+                console.warn('Failed to delete folder map entry:', error);
+            });
+        }
         setMovingApp(null);
     };
 
