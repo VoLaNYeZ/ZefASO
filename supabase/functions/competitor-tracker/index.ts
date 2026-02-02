@@ -44,6 +44,7 @@ type TargetAppInput = {
   developerNames?: string[];
   minScore?: number;
   enablePotential?: boolean;
+  enableKeywordMatch?: boolean;
 };
 
 type TrackerInput = {
@@ -56,6 +57,7 @@ type TrackerInput = {
   dryRun?: boolean;
   stopWords?: string[];
   enablePotential?: boolean;
+  enableKeywordMatch?: boolean;
   mode?: "scheduled";
   userId?: string;
   targetAppName?: string;
@@ -97,6 +99,7 @@ type PreparedTarget = {
   names: NormalizedName[];
   brandTokens: Set<string>;
   enablePotential: boolean;
+  enableKeywordMatch: boolean;
 };
 
 type MatchSignal = {
@@ -108,6 +111,7 @@ type MatchSignal = {
   tokenOverlap: boolean;
   exactSkeletonMatch: boolean;
   sellerMatch: boolean;
+  keywordMatch?: boolean;
 };
 
 type MatchResult = {
@@ -141,6 +145,7 @@ type ScanOptions = {
   aggressive: boolean;
   defaultMinScore: number;
   enablePotential: boolean;
+  enableKeywordMatch: boolean;
 };
 
 type ScanResult = {
@@ -164,6 +169,7 @@ type CompetitorTargetRow = {
   min_score?: number | null;
   is_active?: boolean | null;
   enable_potential?: boolean | null;
+  enable_keyword_match?: boolean | null;
 };
 
 const DEFAULT_STOPWORDS = new Set([
@@ -651,6 +657,31 @@ const normalizeStringArray = (value: unknown): string[] => {
     .filter((item) => item.length > 0);
 };
 
+const buildKeywordSignature = (
+  keyword: string,
+  aggressive: boolean,
+  stopWords: Set<string>,
+) => {
+  const normalized = normalizeName(keyword, aggressive, stopWords);
+  const tokens = normalized.tokens.filter((t) => t.length >= 3);
+  return { tokens, skeleton: normalized.skeleton };
+};
+
+const hasKeywordMatch = (
+  candidate: NormalizedName,
+  keywordTokens: string[],
+  keywordSkeleton: string,
+): boolean => {
+  if (keywordTokens.length === 0) return false;
+  const candidateTokenSet = new Set(candidate.tokens);
+  if (keywordTokens.length === 1) {
+    const token = keywordTokens[0];
+    if (candidateTokenSet.has(token)) return true;
+    return keywordSkeleton ? candidate.skeleton.includes(keywordSkeleton) : false;
+  }
+  return keywordTokens.every((token) => candidateTokenSet.has(token));
+};
+
 const parseKeywordGeoPair = (raw: string): { keyword: string; geo: string } | null => {
   if (!raw) return null;
   const parts = raw.split("::");
@@ -734,6 +765,9 @@ const prepareTargets = (
     const enablePotential = typeof app.enablePotential === "boolean"
       ? app.enablePotential
       : options.enablePotential;
+    const enableKeywordMatch = typeof app.enableKeywordMatch === "boolean"
+      ? app.enableKeywordMatch
+      : options.enableKeywordMatch;
 
     prepared.push({
       key: appKey,
@@ -748,6 +782,7 @@ const prepareTargets = (
       names,
       brandTokens,
       enablePotential,
+      enableKeywordMatch,
     });
   }
 
@@ -788,6 +823,9 @@ const scanTargets = async (
     const key = `${keyword}::${geo}`;
     const list = resultsByKeywordGeo.get(key) || [];
     totalAppsScanned += list.length;
+    const keywordSignature = buildKeywordSignature(keyword, options.aggressive, stopWords);
+    const keywordTokens = keywordSignature.tokens;
+    const keywordSkeleton = keywordSignature.skeleton;
 
     list.forEach((candidateRaw, index) => {
       const candidateName = candidateRaw.trackName || "";
@@ -815,7 +853,27 @@ const scanTargets = async (
           continue;
         }
 
-        const best = scoreNames(target, normalizedCandidate, target.minScore);
+        let best = scoreNames(target, normalizedCandidate, target.minScore);
+        if (!best && target.enableKeywordMatch) {
+          const keywordMatch = hasKeywordMatch(normalizedCandidate, keywordTokens, keywordSkeleton);
+          if (keywordMatch) {
+            const keywordScore = Math.max(0.6, Math.min(0.8, target.minScore - 0.15));
+            best = {
+              score: keywordScore,
+              signals: {
+                jaroWinkler: 0,
+                levenshtein: 0,
+                ngramCosine: 0,
+                prefixMatch: false,
+                suffixMatch: false,
+                tokenOverlap: false,
+                exactSkeletonMatch: false,
+                sellerMatch: false,
+                keywordMatch: true,
+              },
+            };
+          }
+        }
         if (!best) continue;
 
         const seller = candidateRaw.sellerName || "";
@@ -1040,6 +1098,7 @@ const loadTargetsByUser = async (
       developerNames: normalizeStringArray(row.developer_names),
       minScore: row.min_score ?? undefined,
       enablePotential: !!row.enable_potential,
+      enableKeywordMatch: !!row.enable_keyword_match,
     };
 
     if (!map.has(row.user_id)) map.set(row.user_id, []);
@@ -1156,6 +1215,7 @@ serve(async (req) => {
     aggressive,
     defaultMinScore,
     enablePotential: !!body?.enablePotential,
+    enableKeywordMatch: !!body?.enableKeywordMatch,
   };
 
     if (!runStoredTargets) {

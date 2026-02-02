@@ -707,6 +707,7 @@ export const loadCompetitorTargets = async (): Promise<CompetitorTarget[]> => {
         minScore: Number(row.min_score) || 0.86,
         isActive: !!row.is_active,
         enablePotential: !!row.enable_potential,
+        enableKeywordMatch: !!row.enable_keyword_match,
         updatedAt: row.updated_at ?? null
     }));
 };
@@ -723,6 +724,7 @@ export const upsertCompetitorTarget = async (input: {
     minScore?: number;
     isActive?: boolean;
     enablePotential?: boolean;
+    enableKeywordMatch?: boolean;
 }): Promise<void> => {
     const userId = await getUserId();
 
@@ -739,6 +741,7 @@ export const upsertCompetitorTarget = async (input: {
         min_score: input.minScore ?? 0.86,
         is_active: typeof input.isActive === 'boolean' ? input.isActive : true,
         enable_potential: !!input.enablePotential,
+        enable_keyword_match: !!input.enableKeywordMatch,
         updated_at: new Date().toISOString()
     };
 

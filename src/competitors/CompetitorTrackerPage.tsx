@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ChevronDown, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Info, Loader2, RefreshCw } from 'lucide-react';
 import type { CompetitorDetection, CompetitorTarget } from '../../types';
 import type { AsoRow } from '../warnings/computeWarnings';
 import { formatDate } from '../warnings/date';
@@ -20,8 +20,8 @@ interface CompetitorTrackerPageProps {
   competitorDetections: CompetitorDetection[];
   onToggleCompetitorIgnored: (id: string, ignored: boolean) => void;
   competitorTargets: CompetitorTarget[];
-  onTrackCompetitors: (appKey: string, maxPairs?: number, enablePotential?: boolean) => void;
-  onTrackCompetitorsFolder: (appKeys: string[], maxPairs?: number, enablePotential?: boolean, folderKey?: string) => void;
+  onTrackCompetitors: (appKey: string, maxPairs?: number, enablePotential?: boolean, enableKeywordMatch?: boolean) => void;
+  onTrackCompetitorsFolder: (appKeys: string[], maxPairs?: number, enablePotential?: boolean, enableKeywordMatch?: boolean, folderKey?: string) => void;
   onToggleCompetitorTracking: (appKey: string, isActive: boolean) => void;
   onToggleCompetitorTrackingFolder: (appKeys: string[], isActive: boolean) => void;
   onRefreshCompetitors: () => void;
@@ -124,6 +124,7 @@ export const CompetitorTrackerPage: React.FC<CompetitorTrackerPageProps> = ({
   const [trackPopoverKey, setTrackPopoverKey] = useState<string | null>(null);
   const [trackMode, setTrackMode] = useState<'all' | 'top5'>('all');
   const [trackSymbols, setTrackSymbols] = useState(false);
+  const [trackKeywords, setTrackKeywords] = useState(false);
   const trackPopoverRef = useRef<HTMLDivElement | null>(null);
   const [showIgnoredByApp, setShowIgnoredByApp] = useState<Record<string, boolean>>({});
   const [showPotentialByApp, setShowPotentialByApp] = useState<Record<string, boolean>>({});
@@ -280,21 +281,22 @@ export const CompetitorTrackerPage: React.FC<CompetitorTrackerPageProps> = ({
     return formatDate(d);
   };
 
-  const openTrackPopover = (key: string, symbolsDefault = false) => {
+  const openTrackPopover = (key: string, symbolsDefault = false, keywordsDefault = false) => {
     setTrackMode('all');
     setTrackSymbols(symbolsDefault);
+    setTrackKeywords(keywordsDefault);
     setTrackPopoverKey((prev) => (prev === key ? null : key));
   };
 
   const confirmTrackApp = (appKey: string) => {
     if (trackingByApp[appKey] || competitorRefreshing) return;
-    onTrackCompetitors(appKey, trackMode === 'top5' ? 5 : undefined, trackSymbols);
+    onTrackCompetitors(appKey, trackMode === 'top5' ? 5 : undefined, trackSymbols, trackKeywords);
     setTrackPopoverKey(null);
   };
 
   const confirmTrackFolder = (folder: string, appKeys: string[]) => {
     if (trackingByFolder[folder] || competitorRefreshing) return;
-    onTrackCompetitorsFolder(appKeys, trackMode === 'top5' ? 5 : undefined, trackSymbols, folder);
+    onTrackCompetitorsFolder(appKeys, trackMode === 'top5' ? 5 : undefined, trackSymbols, trackKeywords, folder);
     setTrackPopoverKey(null);
   };
 
@@ -477,6 +479,7 @@ export const CompetitorTrackerPage: React.FC<CompetitorTrackerPageProps> = ({
           const folderTrackKey = `folder:${folder}`;
           const folderIsTracking = !!trackingByFolder[folder] || competitorRefreshing;
           const folderSymbolsDefault = folderTargets.length > 0 && folderTargets.every((target) => target.enablePotential);
+          const folderKeywordsDefault = folderTargets.length > 0 && folderTargets.every((target) => target.enableKeywordMatch);
 
           return (
             <div key={folder} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
@@ -519,7 +522,7 @@ export const CompetitorTrackerPage: React.FC<CompetitorTrackerPageProps> = ({
                     ref={trackPopoverKey === folderTrackKey ? trackPopoverRef : null}
                   >
                     <button
-                      onClick={() => openTrackPopover(folderTrackKey, folderSymbolsDefault)}
+                      onClick={() => openTrackPopover(folderTrackKey, folderSymbolsDefault, folderKeywordsDefault)}
                       disabled={folderIsTracking}
                       className="px-2.5 py-1 rounded-md text-[11px] font-bold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
@@ -566,11 +569,39 @@ export const CompetitorTrackerPage: React.FC<CompetitorTrackerPageProps> = ({
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
                               type="checkbox"
+                              checked={trackKeywords}
+                              onChange={(e) => setTrackKeywords(e.target.checked)}
+                              className="h-3.5 w-3.5 accent-indigo-600 dark:accent-indigo-400"
+                            />
+                            <span>{t.competitorTrackKeywords || 'Keyword hunt'}</span>
+                          </label>
+
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
                               checked={trackSymbols}
                               onChange={(e) => setTrackSymbols(e.target.checked)}
                               className="h-3.5 w-3.5 accent-indigo-600 dark:accent-indigo-400"
                             />
-                            <span>{t.competitorTrackSymbols || 'Symbol hunt'}</span>
+                            <span className="inline-flex items-center gap-1">
+                              {t.competitorTrackSymbols || 'Symbol hunt'}
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                }}
+                                onKeyDown={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                }}
+                                title={t.competitorTrackSymbolsTip || 'Finds apps using unusual non‑Latin symbols in the name.'}
+                                className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                              >
+                                <Info size={12} />
+                              </span>
+                            </span>
                           </label>
 
                           <div className="mt-3 flex items-center justify-end gap-2">
@@ -701,7 +732,7 @@ export const CompetitorTrackerPage: React.FC<CompetitorTrackerPageProps> = ({
                                 ref={trackPopoverKey === appTrackKey ? trackPopoverRef : null}
                               >
                                 <button
-                                  onClick={() => openTrackPopover(appTrackKey, target?.enablePotential ?? false)}
+                                  onClick={() => openTrackPopover(appTrackKey, target?.enablePotential ?? false, target?.enableKeywordMatch ?? false)}
                                   disabled={appIsTracking}
                                   className="px-2.5 py-1 rounded-md text-[11px] font-bold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
@@ -748,11 +779,39 @@ export const CompetitorTrackerPage: React.FC<CompetitorTrackerPageProps> = ({
                                       <label className="flex items-center gap-2 cursor-pointer">
                                         <input
                                           type="checkbox"
+                                          checked={trackKeywords}
+                                          onChange={(e) => setTrackKeywords(e.target.checked)}
+                                          className="h-3.5 w-3.5 accent-indigo-600 dark:accent-indigo-400"
+                                        />
+                                        <span>{t.competitorTrackKeywords || 'Keyword hunt'}</span>
+                                      </label>
+
+                                      <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                          type="checkbox"
                                           checked={trackSymbols}
                                           onChange={(e) => setTrackSymbols(e.target.checked)}
                                           className="h-3.5 w-3.5 accent-indigo-600 dark:accent-indigo-400"
                                         />
-                                        <span>{t.competitorTrackSymbols || 'Symbol hunt'}</span>
+                                        <span className="inline-flex items-center gap-1">
+                                          {t.competitorTrackSymbols || 'Symbol hunt'}
+                                          <span
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={(event) => {
+                                              event.preventDefault();
+                                              event.stopPropagation();
+                                            }}
+                                            onKeyDown={(event) => {
+                                              event.preventDefault();
+                                              event.stopPropagation();
+                                            }}
+                                            title={t.competitorTrackSymbolsTip || 'Finds apps using unusual non‑Latin symbols in the name.'}
+                                            className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                                          >
+                                            <Info size={12} />
+                                          </span>
+                                        </span>
                                       </label>
 
                                       <div className="mt-3 flex items-center justify-end gap-2">

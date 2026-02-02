@@ -196,9 +196,11 @@ export const translations = {
         competitorTrackTop5: 'Top 5',
         competitorRun: 'Run',
         competitorTrackFolder: 'Track folder',
+        competitorTrackKeywords: 'Keyword hunt',
         competitorPotential: 'potential',
         competitorBanned: 'banned',
         competitorTrackSymbols: 'Symbol hunt',
+        competitorTrackSymbolsTip: 'Also hunts for apps using unusual non‑Latin symbols in the name.',
         competitorDelete: 'Clear',
 
         // Dashboard Stats
@@ -440,9 +442,11 @@ export const translations = {
         competitorTrackTop5: 'Топ 5',
         competitorRun: 'Запустить',
         competitorTrackFolder: 'Трек папки',
+        competitorTrackKeywords: 'Ключи',
         competitorPotential: 'потенц.',
         competitorBanned: 'в бане',
         competitorTrackSymbols: 'Символы',
+        competitorTrackSymbolsTip: 'Ищет приложения с нетипичными нелатинскими символами в названии.',
         competitorDelete: 'Очистить',
 
         // Dashboard Stats

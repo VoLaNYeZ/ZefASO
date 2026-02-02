@@ -29,6 +29,9 @@ create unique index if not exists competitor_targets_user_app_uniq
 alter table if exists competitor_targets
   add column if not exists keyword_geo_pairs text[] not null default '{}'::text[];
 
+alter table if exists competitor_targets
+  add column if not exists enable_keyword_match boolean not null default false;
+
 create table if not exists competitor_detections (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references auth.users(id) on delete cascade not null,

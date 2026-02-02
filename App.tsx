@@ -935,7 +935,8 @@ const App = () => {
                 keywords: target.keywords || [],
                 geos: target.geos || [],
                 keywordGeoPairs: target.keywordGeoPairs || [],
-                enablePotential: !!target.enablePotential
+                enablePotential: !!target.enablePotential,
+                enableKeywordMatch: !!target.enableKeywordMatch
             }));
 
             const maxPairs = apps.reduce((max, app) => {
@@ -949,7 +950,8 @@ const App = () => {
                     apps,
                     storeResults: true,
                     maxKeywordGeos: Math.min(500, maxPairs || 1),
-                    enablePotential: false
+                    enablePotential: false,
+                    enableKeywordMatch: false
                 }
             });
 
@@ -968,7 +970,7 @@ const App = () => {
         }
     };
 
-    const handleTrackCompetitors = async (appKey: string, maxPairs?: number, enablePotential?: boolean) => {
+    const handleTrackCompetitors = async (appKey: string, maxPairs?: number, enablePotential?: boolean, enableKeywordMatch?: boolean) => {
         if (!sessionUserId) {
             console.warn('Not authenticated');
             return;
@@ -1009,7 +1011,8 @@ const App = () => {
                 geos,
                 keywordGeoPairs,
                 isActive: true,
-                enablePotential: !!enablePotential
+                enablePotential: !!enablePotential,
+                enableKeywordMatch: !!enableKeywordMatch
             });
 
             const { error } = await supabase.functions.invoke('competitor-tracker', {
@@ -1020,11 +1023,13 @@ const App = () => {
                         keywords,
                         geos,
                         keywordGeoPairs: pairs,
-                        enablePotential: !!enablePotential
+                        enablePotential: !!enablePotential,
+                        enableKeywordMatch: !!enableKeywordMatch
                     }],
                     storeResults: true,
                     maxKeywordGeos: Math.min(500, keywordGeoPairs.length || 1),
-                    enablePotential: !!enablePotential
+                    enablePotential: !!enablePotential,
+                    enableKeywordMatch: !!enableKeywordMatch
                 }
             });
 
@@ -1043,7 +1048,7 @@ const App = () => {
         }
     };
 
-    const handleTrackCompetitorsFolder = async (appKeys: string[], maxPairs?: number, enablePotential?: boolean, folderKey?: string) => {
+    const handleTrackCompetitorsFolder = async (appKeys: string[], maxPairs?: number, enablePotential?: boolean, enableKeywordMatch?: boolean, folderKey?: string) => {
         if (!sessionUserId) {
             console.warn('Not authenticated');
             return;
@@ -1098,7 +1103,8 @@ const App = () => {
                 geos,
                 keywordGeoPairs,
                 isActive: true,
-                enablePotential: !!enablePotential
+                enablePotential: !!enablePotential,
+                enableKeywordMatch: !!enableKeywordMatch
             }));
 
             payloadApps.push({
@@ -1107,7 +1113,8 @@ const App = () => {
                 keywords,
                 geos,
                 keywordGeoPairs: result.pairs,
-                enablePotential: !!enablePotential
+                enablePotential: !!enablePotential,
+                enableKeywordMatch: !!enableKeywordMatch
             });
             totalPairs += keywordGeoPairs.length;
         });
@@ -1131,7 +1138,8 @@ const App = () => {
                     apps: payloadApps,
                     storeResults: true,
                     maxKeywordGeos: Math.min(500, totalPairs || 1),
-                    enablePotential: !!enablePotential
+                    enablePotential: !!enablePotential,
+                    enableKeywordMatch: !!enableKeywordMatch
                 }
             });
 

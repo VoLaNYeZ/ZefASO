@@ -107,6 +107,7 @@ export interface CompetitorTarget {
   minScore: number;
   isActive: boolean;
   enablePotential?: boolean;
+  enableKeywordMatch?: boolean;
   updatedAt?: string | null;
 }
 
