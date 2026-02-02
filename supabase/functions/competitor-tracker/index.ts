@@ -202,6 +202,7 @@ const CONFUSABLES: Record<string, string> = {
   "\u0432": "b",
   "\u0435": "e",
   "\u043E": "o",
+  "\u043F": "n",
   "\u0440": "p",
   "\u0441": "c",
   "\u0443": "y",
@@ -216,10 +217,15 @@ const CONFUSABLES: Record<string, string> = {
   "\u0433": "r",
   "\u0455": "s",
   "\u0448": "w",
+  "\u0458": "j",
+  "\u0454": "e",
+  "\u0437": "z",
+  "\u044D": "e",
   "\u03B1": "a",
   "\u03B2": "b",
   "\u03B5": "e",
   "\u03BF": "o",
+  "\u03C0": "n",
   "\u03C1": "p",
   "\u03C4": "t",
   "\u03C5": "y",
@@ -229,7 +235,24 @@ const CONFUSABLES: Record<string, string> = {
   "\u03BB": "l",
   "\u03B9": "i",
   "\u03BC": "m",
+  "\u03B7": "h",
+  "\u03B6": "z",
+  "\u03C2": "s",
+  "\u03C3": "s",
 };
+
+const EXTRA_CONFUSABLE_CODEPOINTS = new Set<number>([
+  0x043f, // CYRILLIC SMALL LETTER PE -> n
+  0x03c0, // GREEK SMALL LETTER PI -> n
+  0x0458, // CYRILLIC SMALL LETTER JE -> j
+  0x0454, // CYRILLIC SMALL LETTER UKRAINIAN IE -> e
+  0x0437, // CYRILLIC SMALL LETTER ZE -> z
+  0x044d, // CYRILLIC SMALL LETTER E -> e
+  0x03b7, // GREEK SMALL LETTER ETA -> h
+  0x03b6, // GREEK SMALL LETTER ZETA -> z
+  0x03c2, // GREEK SMALL LETTER FINAL SIGMA -> s
+  0x03c3, // GREEK SMALL LETTER SIGMA -> s
+]);
 
 const DIGIT_CONFUSABLES: Record<string, string> = {
   "0": "o",
@@ -339,7 +362,7 @@ const detectPotentialConfusable = (raw: string): { isPotential: boolean; reason:
     if (!LETTER_RE.test(ch)) continue;
     if (LATIN_RE.test(ch)) continue;
     const code = ch.codePointAt(0);
-    if (!code || !CONFUSABLE_ASCII_CODEPOINTS.has(code)) continue;
+    if (!code || (!CONFUSABLE_ASCII_CODEPOINTS.has(code) && !EXTRA_CONFUSABLE_CODEPOINTS.has(code))) continue;
     hasConfusable = true;
     if (/\p{Script=Cyrillic}/u.test(ch)) scriptHints.add("cyrillic");
     else if (/\p{Script=Greek}/u.test(ch)) scriptHints.add("greek");
