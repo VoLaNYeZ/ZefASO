@@ -667,6 +667,23 @@ const buildKeywordSignature = (
   return { tokens, skeleton: normalized.skeleton };
 };
 
+const filterKeywordTokensForTarget = (
+  keywordTokens: string[],
+  target: PreparedTarget,
+  stopWords: Set<string>,
+): string[] => {
+  if (keywordTokens.length === 0) return [];
+  return keywordTokens.filter((token) => {
+    if (!token) return false;
+    if (stopWords.has(token)) return false;
+    if (token.length <= 3) {
+      if (/\d/.test(token)) return true;
+      return target.brandTokens.has(token);
+    }
+    return true;
+  });
+};
+
 const hasKeywordMatch = (
   candidate: NormalizedName,
   keywordTokens: string[],
@@ -826,6 +843,15 @@ const scanTargets = async (
     const keywordSignature = buildKeywordSignature(keyword, options.aggressive, stopWords);
     const keywordTokens = keywordSignature.tokens;
     const keywordSkeleton = keywordSignature.skeleton;
+    const keywordTokensByTarget = new Map<string, { tokens: string[]; skeleton: string }>();
+    if (keywordTokens.length > 0) {
+      for (const target of prepared) {
+        if (!target.enableKeywordMatch) continue;
+        const filtered = filterKeywordTokensForTarget(keywordTokens, target, stopWords);
+        if (filtered.length === 0) continue;
+        keywordTokensByTarget.set(target.key, { tokens: filtered, skeleton: keywordSkeleton });
+      }
+    }
 
     list.forEach((candidateRaw, index) => {
       const candidateName = candidateRaw.trackName || "";
@@ -855,7 +881,10 @@ const scanTargets = async (
 
         let best = scoreNames(target, normalizedCandidate, target.minScore);
         if (!best && target.enableKeywordMatch) {
-          const keywordMatch = hasKeywordMatch(normalizedCandidate, keywordTokens, keywordSkeleton);
+          const keywordEntry = keywordTokensByTarget.get(target.key);
+          const keywordMatch = keywordEntry
+            ? hasKeywordMatch(normalizedCandidate, keywordEntry.tokens, keywordEntry.skeleton)
+            : false;
           if (keywordMatch) {
             const keywordScore = Math.max(0.6, Math.min(0.8, target.minScore - 0.15));
             best = {

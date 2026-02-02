@@ -573,7 +573,25 @@ export const CompetitorTrackerPage: React.FC<CompetitorTrackerPageProps> = ({
                               onChange={(e) => setTrackKeywords(e.target.checked)}
                               className="h-3.5 w-3.5 accent-indigo-600 dark:accent-indigo-400"
                             />
-                            <span>{t.competitorTrackKeywords || 'Keyword hunt'}</span>
+                            <span className="inline-flex items-center gap-1">
+                              {t.competitorTrackKeywords || 'Keyword hunt'}
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                }}
+                                onKeyDown={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                }}
+                                title={t.competitorTrackKeywordsTip || 'Also scans for apps that include the keyword in the title.'}
+                                className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                              >
+                                <Info size={12} />
+                              </span>
+                            </span>
                           </label>
 
                           <label className="flex items-center gap-2 cursor-pointer">
@@ -783,7 +801,25 @@ export const CompetitorTrackerPage: React.FC<CompetitorTrackerPageProps> = ({
                                           onChange={(e) => setTrackKeywords(e.target.checked)}
                                           className="h-3.5 w-3.5 accent-indigo-600 dark:accent-indigo-400"
                                         />
-                                        <span>{t.competitorTrackKeywords || 'Keyword hunt'}</span>
+                                        <span className="inline-flex items-center gap-1">
+                                          {t.competitorTrackKeywords || 'Keyword hunt'}
+                                          <span
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={(event) => {
+                                              event.preventDefault();
+                                              event.stopPropagation();
+                                            }}
+                                            onKeyDown={(event) => {
+                                              event.preventDefault();
+                                              event.stopPropagation();
+                                            }}
+                                            title={t.competitorTrackKeywordsTip || 'Also scans for apps that include the keyword in the title.'}
+                                            className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                                          >
+                                            <Info size={12} />
+                                          </span>
+                                        </span>
                                       </label>
 
                                       <label className="flex items-center gap-2 cursor-pointer">
