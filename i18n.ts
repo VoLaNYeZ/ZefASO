@@ -217,7 +217,7 @@ export const translations = {
         geos: 'Geos',
 
         // Real-Time Standings
-        realTimeStandings: 'Real-Time Standings (iTunes)',
+        realTimeStandings: 'Real-Time Standings',
         refreshAll: 'Refresh All',
         disconnectSheetTitle: 'Disconnect Google Sheets sync?',
         disconnectSheetSub: 'You can reconnect later.',
@@ -464,7 +464,7 @@ export const translations = {
         geos: 'гео',
 
         // Real-Time Standings
-        realTimeStandings: 'Позиции в реальном времени (iTunes)',
+        realTimeStandings: 'Позиции в реальном времени',
         refreshAll: 'Обновить все',
         disconnectSheetTitle: 'Отключить синхронизацию Google Sheets?',
         disconnectSheetSub: 'Позже можно подключить заново.',
