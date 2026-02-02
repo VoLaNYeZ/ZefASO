@@ -11,6 +11,7 @@ const ALLOWED_ORIGINS = [
 ];
 
 const ITUNES_RATE_LIMIT_MS = 3200;
+const BAN_CHECK_TTL_MS = 1000 * 60 * 60 * 24 * 3;
 let rateLimitChain = Promise.resolve();
 let nextRateAllowedAt = 0;
 
@@ -599,6 +600,35 @@ const fetchItunes = async (
   }
 };
 
+const fetchItunesLookup = async (
+  trackId: string,
+  geo: string,
+): Promise<boolean | null> => {
+  const country = toIsoCountryCode(geo);
+  const url = `https://itunes.apple.com/lookup?id=${encodeURIComponent(trackId)}&country=${encodeURIComponent(country)}`;
+  let attempt = 0;
+  while (true) {
+    attempt++;
+    await scheduleRateLimit();
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; ZeyfASO/1.0)" },
+    });
+    if (response.status === 429 && attempt < 3) {
+      const retryAfter = response.headers.get("Retry-After");
+      const delayMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 2000 * attempt;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      continue;
+    }
+    if (!response.ok) {
+      return null;
+    }
+    const data = await response.json();
+    const resultCount = typeof data?.resultCount === "number" ? data.resultCount : null;
+    if (resultCount === null) return null;
+    return resultCount === 0;
+  }
+};
+
 const runWithLimit = async <T>(
   items: T[],
   limit: number,
@@ -1019,6 +1049,88 @@ const loadTargetsByUser = async (
   return map;
 };
 
+type BanCandidateRow = {
+  id: string;
+  candidate_track_id?: string | null;
+  found_in?: { keyword: string; geo: string; rank: number }[] | null;
+};
+
+const pickGeoFromFoundIn = (foundIn: BanCandidateRow["found_in"]): string => {
+  if (Array.isArray(foundIn)) {
+    for (const entry of foundIn) {
+      const geo = normalizeGeoInput((entry as any)?.geo ?? "");
+      if (geo) return geo;
+    }
+  }
+  return "US";
+};
+
+const refreshBannedStatuses = async (
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  targetAppNames: string[],
+  nowIso: string,
+): Promise<{ checked: number; updated: number }> => {
+  if (!Array.isArray(targetAppNames) || targetAppNames.length === 0) {
+    return { checked: 0, updated: 0 };
+  }
+
+  const cutoffIso = new Date(Date.now() - BAN_CHECK_TTL_MS).toISOString();
+  const rows: BanCandidateRow[] = [];
+  const batchSize = 200;
+
+  for (let i = 0; i < targetAppNames.length; i += batchSize) {
+    const batch = targetAppNames.slice(i, i + batchSize);
+    const { data, error } = await supabase
+      .from("competitor_detections")
+      .select("id,candidate_track_id,found_in,banned_checked_at")
+      .eq("user_id", userId)
+      .in("target_app_name", batch)
+      .not("candidate_track_id", "is", null)
+      .or(`banned_checked_at.is.null,banned_checked_at.lt.${cutoffIso}`);
+    if (error) throw error;
+    if (Array.isArray(data)) rows.push(...(data as BanCandidateRow[]));
+  }
+
+  const statusCache = new Map<string, boolean>();
+  const bannedIds: string[] = [];
+  const okIds: string[] = [];
+
+  for (const row of rows) {
+    const trackId = typeof row.candidate_track_id === "string" ? row.candidate_track_id.trim() : "";
+    if (!trackId) continue;
+    const geo = pickGeoFromFoundIn(row.found_in);
+    const cacheKey = `${trackId}::${geo}`;
+    let isBanned = statusCache.get(cacheKey);
+    if (typeof isBanned !== "boolean") {
+      const result = await fetchItunesLookup(trackId, geo);
+      if (typeof result !== "boolean") continue;
+      isBanned = result;
+      statusCache.set(cacheKey, isBanned);
+    }
+    if (isBanned) bannedIds.push(row.id);
+    else okIds.push(row.id);
+  }
+
+  const updateBatch = async (ids: string[], isBanned: boolean) => {
+    const chunkSize = 200;
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      const { error } = await supabase
+        .from("competitor_detections")
+        .update({ is_banned: isBanned, banned_checked_at: nowIso })
+        .eq("user_id", userId)
+        .in("id", chunk);
+      if (error) throw error;
+    }
+  };
+
+  if (bannedIds.length > 0) await updateBatch(bannedIds, true);
+  if (okIds.length > 0) await updateBatch(okIds, false);
+
+  return { checked: rows.length, updated: bannedIds.length + okIds.length };
+};
+
 serve(async (req) => {
   const origin = req.headers.get("origin");
   if (req.method === "OPTIONS") {
@@ -1064,6 +1176,7 @@ serve(async (req) => {
       }
 
       const scan = await scanTargets(apps, options, stopWords, !!body?.dryRun);
+      const nowIso = new Date().toISOString();
       let detectionsUpserted = 0;
       if (body?.storeResults) {
         if (!body?.dryRun) {
@@ -1071,8 +1184,18 @@ serve(async (req) => {
             userContext.supabase,
             userContext.userId,
             scan.matches,
-            new Date().toISOString(),
+            nowIso,
           );
+          try {
+            await refreshBannedStatuses(
+              userContext.supabase,
+              userContext.userId,
+              apps.map((app) => app.appName).filter(Boolean),
+              nowIso,
+            );
+          } catch (banError) {
+            console.error("[competitor-tracker] ban refresh failed", banError);
+          }
         }
       }
 
@@ -1134,6 +1257,16 @@ serve(async (req) => {
         if (body?.dryRun) continue;
 
         detectionsUpserted += await upsertDetections(supabase, userId, scan.matches, nowIso);
+        try {
+          await refreshBannedStatuses(
+            supabase,
+            userId,
+            targets.map((target) => target.appName),
+            nowIso,
+          );
+        } catch (banError) {
+          console.error(`[competitor-tracker] ban refresh failed user=${userId}`, banError);
+        }
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         userErrors.push({ user_id: userId, error: message });

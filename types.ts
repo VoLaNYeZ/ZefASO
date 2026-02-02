@@ -88,6 +88,8 @@ export interface CompetitorDetection {
   foundIn?: { keyword: string; geo: string; rank: number }[];
   isPotential?: boolean;
   potentialReason?: string | null;
+  isBanned?: boolean;
+  bannedCheckedAt?: string | null;
   firstSeenAt: string;
   lastSeenAt: string;
   isIgnored: boolean;

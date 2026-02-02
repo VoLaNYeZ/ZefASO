@@ -2,7 +2,7 @@ export const translations = {
     en: {
         // Navigation & General
         overview: 'Overview',
-        theLab: 'The Lab',
+        theLab: 'Lab',
         warnings: 'Warnings',
         back: 'Back',
         close: 'Close',
@@ -197,6 +197,7 @@ export const translations = {
         competitorRun: 'Run',
         competitorTrackFolder: 'Track folder',
         competitorPotential: 'potential',
+        competitorBanned: 'banned',
         competitorTrackSymbols: 'Symbol hunt',
         competitorDelete: 'Clear',
 
@@ -245,7 +246,7 @@ export const translations = {
     ru: {
         // Navigation & General
         overview: 'Обзор',
-        theLab: 'Лаборатория',
+        theLab: 'Лаба',
         warnings: 'Предупреждения',
         back: 'Назад',
         close: 'Закрыть',
@@ -440,6 +441,7 @@ export const translations = {
         competitorRun: 'Запустить',
         competitorTrackFolder: 'Трек папки',
         competitorPotential: 'потенц.',
+        competitorBanned: 'в бане',
         competitorTrackSymbols: 'Символы',
         competitorDelete: 'Очистить',
 

@@ -50,6 +50,7 @@ import {
     Languages,
     LogOut,
     Bell,
+    Target,
     Loader2
 } from 'lucide-react';
 import { INITIAL_DATA } from './constants';
@@ -72,6 +73,7 @@ import { ALL_TABS_SENTINEL, buildStoredTabsAllExcept, resolveTabsToSync } from '
 import { BalancePanel } from './components/BalancePanel';
 import { AppAliasManager } from './components/AppAliasManager';
 import { WarningsPage } from './src/warnings/WarningsPage';
+import { CompetitorTrackerPage } from './src/competitors/CompetitorTrackerPage';
 import { computeWarnings } from './src/warnings/computeWarnings';
 import { addDays, formatDate } from './src/warnings/date';
 import { cloneDefaultWarningsRules } from './src/warnings/defaults';
@@ -620,7 +622,7 @@ const App = () => {
     }, [lang]);
 
     // -- UI State --
-    const [currentPage, setCurrentPage] = useState<'dashboard' | 'overview' | 'lab' | 'warnings'>('overview');
+    const [currentPage, setCurrentPage] = useState<'dashboard' | 'overview' | 'lab' | 'warnings' | 'competitors'>('overview');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -1280,6 +1282,15 @@ const App = () => {
         if (!Number.isFinite(raw)) return 0;
         return Math.max(0, Math.trunc(raw));
     }, [warningsSummary]);
+
+    const competitorCount = useMemo(() => {
+        let total = 0;
+        (Array.isArray(competitorDetections) ? competitorDetections : []).forEach((item) => {
+            if (item?.isIgnored || item?.isPotential || item?.isBanned) return;
+            total += 1;
+        });
+        return total;
+    }, [competitorDetections]);
 
     // Group Active Apps by Category
     const groupedApps = useMemo(() => {
@@ -2404,7 +2415,7 @@ const App = () => {
                         </div>
                     </button>
 
-                    {/* The Lab Button + Warnings */}
+                    {/* The Lab Button + Warnings + Competitors */}
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setCurrentPage('lab')}
@@ -2416,7 +2427,6 @@ const App = () => {
                             <FlaskConical size={20} className="shrink-0" />
                             <div className="flex flex-col min-w-0">
                                 <span className={`font-bold leading-none truncate ${lang === 'ru' ? 'text-[13px]' : ''}`}>{t.theLab}</span>
-                                <span className={`text-[10px] mt-1 truncate ${currentPage === 'lab' ? 'text-indigo-100' : 'text-slate-500'}`}>{t.labSub}</span>
                             </div>
                         </button>
 
@@ -2437,6 +2447,27 @@ const App = () => {
                             {warningsCount > 0 && (
                                 <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow">
                                     {warningsCount > 99 ? '99+' : warningsCount}
+                                </span>
+                            )}
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                setCurrentPage('competitors');
+                                if (window.innerWidth < 768) {
+                                    setIsSidebarOpen(false);
+                                }
+                            }}
+                            className={`relative shrink-0 w-12 min-h-[3rem] flex items-center justify-center rounded-xl border transition-all active:scale-95 ${currentPage === 'competitors'
+                                ? 'bg-indigo-600 text-white border-indigo-500/40 shadow-lg shadow-indigo-900/20'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border-slate-700'
+                                }`}
+                            title={t.competitorTracker || 'Competitors'}
+                        >
+                            <Target size={22} />
+                            {competitorCount > 0 && (
+                                <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center shadow">
+                                    {competitorCount > 99 ? '99+' : competitorCount}
                                 </span>
                             )}
                         </button>
@@ -2901,6 +2932,20 @@ const App = () => {
                              setWarningsSettings={setWarningsSettings}
                              setCurrentPage={setCurrentPage}
                              setFilters={setFilters}
+                         />
+                     </div>
+                 ) : currentPage === 'competitors' ? (
+                     <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
+                         <CompetitorTrackerPage
+                             rows={data}
+                             categories={categories}
+                             appCategoryMap={appCategoryMap}
+                             hiddenApps={hiddenApps}
+                             appIcons={appIcons}
+                             getCountryFlag={getCountryFlag}
+                             lang={lang}
+                             t={t}
+                             setCurrentPage={setCurrentPage}
                              competitorDetections={competitorDetections}
                              onToggleCompetitorIgnored={handleToggleCompetitorIgnored}
                              competitorTargets={competitorTargets}

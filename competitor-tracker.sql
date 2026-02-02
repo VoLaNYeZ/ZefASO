@@ -71,6 +71,18 @@ alter table if exists competitor_detections
 alter table if exists competitor_detections
   add column if not exists potential_reason text;
 
+alter table if exists competitor_detections
+  add column if not exists is_banned boolean not null default false;
+
+alter table if exists competitor_detections
+  add column if not exists banned_checked_at timestamptz;
+
+create index if not exists competitor_detections_user_banned_idx
+  on competitor_detections(user_id, is_banned);
+
+create index if not exists competitor_detections_user_candidate_idx
+  on competitor_detections(user_id, candidate_track_id);
+
 alter table competitor_targets enable row level security;
 alter table competitor_detections enable row level security;
 

@@ -828,6 +828,8 @@ export const loadCompetitorDetections = async (): Promise<CompetitorDetection[]>
         foundIn: row.found_in ?? null,
         isPotential: !!row.is_potential,
         potentialReason: row.potential_reason ?? null,
+        isBanned: !!row.is_banned,
+        bannedCheckedAt: row.banned_checked_at ?? null,
         firstSeenAt: row.first_seen_at,
         lastSeenAt: row.last_seen_at,
         isIgnored: !!row.is_ignored,
