@@ -13,41 +13,41 @@ const subDays = (date: Date, days: number) => {
 
 // Initial Seed Data simulating a Google Sheet import
 export const INITIAL_DATA: AsoEntry[] = [
-  // App 1: SecretBen
+  // App 1: Demo Finance
   ...Array.from({ length: 14 }).map((_, i) => ({
     id: `sb-us-${i}`,
     date: formatDate(subDays(today, 13 - i)),
-    appName: 'SecretBen',
-    appGroup: 'SecretBen',
+    appName: 'Demo Finance',
+    appGroup: 'Demo Finance',
     geo: 'US',
-    appId: 'SecretBen 1749590447', // Composite Name + ID
-    keyword: 'Secret Ben',
+    appId: 'Demo Finance 1000000001', // Composite Name + ID
+    keyword: 'budget tracker',
     ranking: Math.max(1, 50 - (i * 3) + Math.floor(Math.random() * 5)), // Ranking improving
     installs: 50 + (i * 10) + Math.floor(Math.random() * 20), // Installs increasing
     cpi: 0.09
   })),
-  // App 1: SecretBen (Different Keyword)
+  // App 1: Demo Finance (Different Keyword)
   ...Array.from({ length: 14 }).map((_, i) => ({
     id: `sb-us-kw2-${i}`,
     date: formatDate(subDays(today, 13 - i)),
-    appName: 'SecretBen',
-    appGroup: 'SecretBen',
+    appName: 'Demo Finance',
+    appGroup: 'Demo Finance',
     geo: 'US',
-    appId: 'SecretBen 1749590447',
-    keyword: 'Hidden Friend',
+    appId: 'Demo Finance 1000000001',
+    keyword: 'expense planner',
     ranking: Math.max(1, 100 - i + Math.floor(Math.random() * 10)),
     installs: 20 + i + Math.floor(Math.random() * 5),
     cpi: 0.12 // Slightly higher CPI for this keyword campaign
   })),
-  // App 2: FitnessPro
+  // App 2: Demo Fitness
   ...Array.from({ length: 14 }).map((_, i) => ({
     id: `fp-uk-${i}`,
     date: formatDate(subDays(today, 13 - i)),
-    appName: 'FitnessPro',
-    appGroup: 'FitnessPro',
+    appName: 'Demo Fitness',
+    appGroup: 'Demo Fitness',
     geo: 'UK',
-    appId: 'FitnessPro 999888777',
-    keyword: 'Home Workout',
+    appId: 'Demo Fitness 1000000002',
+    keyword: 'home workout',
     ranking: Math.max(1, 10 + (i % 5)), // Fluctuating rank
     installs: 200 + Math.floor(Math.random() * 50),
     cpi: 0.09

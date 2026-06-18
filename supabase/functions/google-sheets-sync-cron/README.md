@@ -37,9 +37,9 @@ Cron (UTC):
 
 `0 21,3,9,15 * * *`
 
-## Security (optional)
+## Security
 
-If you set an env var `CRON_SECRET`, the function requires a matching request header:
+Set an env var `CRON_SECRET`. The function requires a matching request header:
 
 - `x-cron-secret: <CRON_SECRET>`
 
@@ -47,4 +47,4 @@ It also accepts a query param for schedulers that can’t send custom headers:
 
 - `?cron_secret=<CRON_SECRET>`
 
-If `CRON_SECRET` is not set, the function runs without this check.
+If `CRON_SECRET` is not set, the function returns `401`.

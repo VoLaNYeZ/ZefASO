@@ -9,9 +9,10 @@
  * 5. Click Deploy > New deployment
  * 6. Choose "Web app"
  * 7. Set "Execute as" to "Me"
- * 8. Set "Who has access" to "Anyone"
- * 9. Click Deploy
- * 10. Copy the Web App URL and paste it into your ASO app
+ * 8. Set access to the least-permissive option that works for your deployment
+ * 9. Treat the Web App URL as sensitive because it can expose sheet data
+ * 10. Click Deploy
+ * 11. Copy the Web App URL and paste it into your ASO app
  */
 
 function doGet(e) {

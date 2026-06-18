@@ -319,7 +319,7 @@ const App = () => {
                     loadAppFolderMap()
                 ]);
 
-                const testAppNames = new Set(['SecretBen', 'FitnessPro']);
+                const testAppNames = new Set(['Demo Finance', 'Demo Fitness']);
                 const asoData = asoDataRaw.filter(d => !testAppNames.has(d.appName));
 
                 // Update sync state
@@ -422,7 +422,7 @@ const App = () => {
         try {
             const asoDataRaw = await loadAsoData();
             if (refreshId !== asoRefreshIdRef.current) return;
-            const testAppNames = new Set(['SecretBen', 'FitnessPro']);
+            const testAppNames = new Set(['Demo Finance', 'Demo Fitness']);
             const asoData = asoDataRaw.filter(d => !testAppNames.has(d.appName));
             setData(asoData);
             lastAsoRefreshRef.current = Date.now();

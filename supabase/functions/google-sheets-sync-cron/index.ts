@@ -231,15 +231,19 @@ const processSheetDataToDb = (
 serve(async (req) => {
   try {
     const cronSecret = Deno.env.get("CRON_SECRET");
-    if (cronSecret) {
-      const provided = req.headers.get("x-cron-secret") ??
-        new URL(req.url).searchParams.get("cron_secret");
-      if (!provided || provided !== cronSecret) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
+    if (!cronSecret) {
+      return new Response(JSON.stringify({ error: "CRON_SECRET not configured" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const provided = req.headers.get("x-cron-secret") ??
+      new URL(req.url).searchParams.get("cron_secret");
+    if (!provided || provided !== cronSecret) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Note: Supabase injects SUPABASE_URL automatically for Edge Functions.

@@ -161,7 +161,7 @@ serve(async (req) => {
                 {
                     role: 'user',
                     content: `
-You are an ASO operator optimizing Rank via controlled Installs (phone farm). Your goal is Rank efficiency.
+You are an ASO operator analyzing rank and install performance. Your goal is Rank efficiency.
 Analyze the following performance data for App: "${body.appName}", GEO: "${body.geo}", Keyword: "${body.keyword}".
 
 Data:
@@ -170,7 +170,7 @@ ${body.dataSummary}
 Important assumptions:
 - Never say that improving Rank causes more Installs. Treat Installs as the main input signal that can influence Rank.
 - Rank = 0 means no ranking data for that day or no ranking data at all.
-- CPI is an internal value we set. Do not analyze CPI trends as a market signal. Use it only to estimate spend and efficiency.
+- CPI is a configured planning value. Do not analyze CPI trends as a market signal. Use it only to estimate spend and efficiency.
 - If you mention relationships, phrase them as "Installs and Rank moved together" or "Installs changes preceded Rank changes".
 
 Output requirements:

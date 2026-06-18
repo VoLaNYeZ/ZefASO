@@ -66,7 +66,9 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
     const [panelPosition, setPanelPosition] = useState<{ top: number; left: number; width: number } | null>(null);
     const [showWalletModal, setShowWalletModal] = useState(false);
     const [walletCopied, setWalletCopied] = useState(false);
-    const walletAddress = 'TS2uavPzfMS9vz5eEfWUe4GxKZyn1V2bou';
+    const walletAddress = (import.meta.env.VITE_USDT_WALLET_ADDRESS || '').trim();
+    const walletQrPath = (import.meta.env.VITE_USDT_WALLET_QR_PATH || '').trim();
+    const hasWalletConfig = walletAddress.length > 0;
     const walletInputRef = useRef<HTMLInputElement | null>(null);
     const lastBalanceLoadRef = useRef(0);
     const balanceLoadIdRef = useRef(0);
@@ -344,7 +346,9 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
     };
 
     const walletLabels = {
-        footer: lang === 'ru' ? 'QR кошелька' : 'Wallet QR',
+        footer: walletQrPath
+            ? (lang === 'ru' ? 'QR кошелька' : 'Wallet QR')
+            : (lang === 'ru' ? 'Кошелек' : 'Wallet'),
         title: lang === 'ru' ? 'Кошелек для пополнения' : 'Replenishment wallet',
         address: lang === 'ru' ? 'USDT адрес' : 'USDT wallet',
         copy: lang === 'ru' ? 'Скопировать' : 'Copy',
@@ -352,6 +356,7 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
     };
 
     const handleCopyWallet = async () => {
+        if (!walletAddress) return;
         try {
             if (navigator.clipboard?.writeText) {
                 await navigator.clipboard.writeText(walletAddress);
@@ -660,7 +665,7 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
                                 </div>
                             ))}
                         </div>
-                        <div className="border-t border-slate-800">
+                        {hasWalletConfig && <div className="border-t border-slate-800">
                             <button
                                 type="button"
                                 onClick={() => setShowWalletModal(true)}
@@ -672,13 +677,13 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
                                 </span>
                                 <ChevronRight size={16} className="text-slate-500" />
                             </button>
-                        </div>
+                        </div>}
                     </div>
                 </div>,
                 document.body
             )}
 
-            {showWalletModal && createPortal(
+            {showWalletModal && hasWalletConfig && createPortal(
                 <div
                     className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
                     onClick={() => setShowWalletModal(false)}
@@ -692,13 +697,13 @@ export const BalancePanel: React.FC<BalancePanelProps> = ({ session, totalInstal
                             <h3 className="text-lg font-bold text-slate-100 mt-1">{walletLabels.title}</h3>
                         </div>
                         <div className="px-5 py-4 space-y-4">
-                            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3 flex items-center justify-center">
+                            {walletQrPath && <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3 flex items-center justify-center">
                                 <img
-                                    src="/ChineseUSDT.png"
+                                    src={walletQrPath}
                                     alt="Wallet QR"
                                     className="w-48 h-48 object-contain"
                                 />
-                            </div>
+                            </div>}
                             <div className="space-y-2">
                                 <p className="text-xs text-slate-400 font-semibold uppercase tracking-[0.12em]">{walletLabels.address}</p>
                                 <div className="flex items-center gap-2">
